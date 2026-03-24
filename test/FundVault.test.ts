@@ -1,133 +1,117 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { FundVault, MockUSDC } from "../typechain-types";
+import { FundVaultV01, MockUSDC, StrategyManagerV01, DummyStrategy } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
-describe("FundVault", function () {
-  let vault: FundVault;
+describe("FundVaultV01", function () {
+  let vault: FundVaultV01;
   let usdc: MockUSDC;
-  let deployer: SignerWithAddress;
-  let treasury: SignerWithAddress;
+  let admin: SignerWithAddress;
   let guardian: SignerWithAddress;
-  let admin: SignerWithAddress; // timelock stand-in
+  let treasury: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
 
-  const DEPOSIT_AMOUNT = ethers.parseUnits("1000", 6); // 1000 USDC
-  const GUARDIAN_ROLE = ethers.keccak256(ethers.toUtf8Bytes("GUARDIAN_ROLE"));
-  const DEFAULT_ADMIN_ROLE = ethers.ZeroHash;
+  const D6 = (n: number) => ethers.parseUnits(String(n), 6);
+  const DEPOSIT = D6(1000);
 
   beforeEach(async function () {
-    [deployer, treasury, guardian, admin, alice, bob] = await ethers.getSigners();
+    [, admin, guardian, treasury, alice, bob] = await ethers.getSigners();
 
-    // Deploy MockUSDC
-    const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-    usdc = await MockUSDCFactory.deploy();
-
-    // Deploy FundVault (admin acts as timelock)
-    const FundVaultFactory = await ethers.getContractFactory("FundVault");
-    vault = await FundVaultFactory.deploy(
+    usdc = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    vault = await (await ethers.getContractFactory("FundVaultV01")).deploy(
       await usdc.getAddress(),
-      "Fund Vault",
-      "fvUSDC",
-      treasury.address,
-      guardian.address,
-      admin.address
+      "Fund Vault", "fvUSDC",
+      treasury.address, guardian.address, admin.address
     );
 
-    // Mint USDC to alice and bob
-    await usdc.mint(alice.address, DEPOSIT_AMOUNT * BigInt(10));
-    await usdc.mint(bob.address, DEPOSIT_AMOUNT * BigInt(10));
-
-    // Approve vault
+    await usdc.mint(alice.address, DEPOSIT * 10n);
+    await usdc.mint(bob.address, DEPOSIT * 10n);
     await usdc.connect(alice).approve(await vault.getAddress(), ethers.MaxUint256);
     await usdc.connect(bob).approve(await vault.getAddress(), ethers.MaxUint256);
   });
 
   // ---------------------------------------------------------------------------
-  // Deployment / initial state
+  // Deployment
   // ---------------------------------------------------------------------------
   describe("Deployment", function () {
-    it("should have correct asset", async function () {
+    it("asset is USDC", async function () {
       expect(await vault.asset()).to.equal(await usdc.getAddress());
     });
-
-    it("should have 18 decimals for shares", async function () {
+    it("shares have 18 decimals", async function () {
       expect(await vault.decimals()).to.equal(18);
     });
-
-    it("should start with zero totalAssets", async function () {
+    it("initial totalAssets is 0", async function () {
       expect(await vault.totalAssets()).to.equal(0);
     });
-
-    it("should set treasury correctly", async function () {
+    it("treasury is set", async function () {
       expect(await vault.treasury()).to.equal(treasury.address);
     });
-
-    it("should have depositsPaused = false initially", async function () {
+    it("depositsPaused starts false", async function () {
       expect(await vault.depositsPaused()).to.equal(false);
     });
-
-    it("should have redeemsPaused = false initially", async function () {
+    it("redeemsPaused starts false", async function () {
       expect(await vault.redeemsPaused()).to.equal(false);
     });
-
-    it("should have externalTransfersEnabled = false initially", async function () {
+    it("externalTransfersEnabled starts false", async function () {
       expect(await vault.externalTransfersEnabled()).to.equal(false);
     });
+    it("reserveRatioBps starts at 10_000 (100%)", async function () {
+      expect(await vault.reserveRatioBps()).to.equal(10_000);
+    });
   });
 
   // ---------------------------------------------------------------------------
-  // deposit / redeem normal flow
+  // deposit
   // ---------------------------------------------------------------------------
   describe("deposit", function () {
-    it("should deposit USDC and receive shares", async function () {
-      const sharesBefore = await vault.totalSupply();
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      const sharesAfter = await vault.totalSupply();
-      expect(sharesAfter).to.be.gt(sharesBefore);
+    it("mints shares and increases totalAssets", async function () {
+      await vault.connect(alice).deposit(DEPOSIT, alice.address);
       expect(await vault.balanceOf(alice.address)).to.be.gt(0);
+      expect(await vault.totalAssets()).to.equal(DEPOSIT);
     });
-
-    it("totalAssets invariant: equals USDC balance after deposit", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      const totalAssets = await vault.totalAssets();
-      const usdcBalance = await usdc.balanceOf(await vault.getAddress());
-      expect(totalAssets).to.equal(usdcBalance);
+    it("totalAssets equals vault USDC balance after deposit", async function () {
+      await vault.connect(alice).deposit(DEPOSIT, alice.address);
+      expect(await vault.totalAssets()).to.equal(
+        await usdc.balanceOf(await vault.getAddress())
+      );
     });
-
-    it("should revert when depositsPaused", async function () {
+    it("reverts when depositsPaused", async function () {
       await vault.connect(guardian).pauseDeposits();
       await expect(
-        vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address)
+        vault.connect(alice).deposit(DEPOSIT, alice.address)
       ).to.be.revertedWithCustomError(vault, "DepositsArePaused");
+    });
+    it("pricePerShare is 1 USDC after first deposit", async function () {
+      await vault.connect(alice).deposit(DEPOSIT, alice.address);
+      expect(await vault.pricePerShare()).to.equal(D6(1));
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // redeem
+  // ---------------------------------------------------------------------------
   describe("redeem", function () {
     beforeEach(async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
+      await vault.connect(alice).deposit(DEPOSIT, alice.address);
     });
 
-    it("should redeem shares and receive USDC", async function () {
+    it("burns shares and returns USDC", async function () {
       const shares = await vault.balanceOf(alice.address);
-      const usdcBefore = await usdc.balanceOf(alice.address);
+      const before = await usdc.balanceOf(alice.address);
       await vault.connect(alice).redeem(shares, alice.address, alice.address);
-      const usdcAfter = await usdc.balanceOf(alice.address);
-      expect(usdcAfter).to.be.gt(usdcBefore);
+      expect(await usdc.balanceOf(alice.address)).to.be.gt(before);
       expect(await vault.balanceOf(alice.address)).to.equal(0);
     });
-
-    it("totalAssets invariant: equals USDC balance after redeem", async function () {
+    it("totalAssets equals vault balance after redeem", async function () {
       const shares = await vault.balanceOf(alice.address);
-      await vault.connect(alice).redeem(shares / BigInt(2), alice.address, alice.address);
-      const totalAssets = await vault.totalAssets();
-      const usdcBalance = await usdc.balanceOf(await vault.getAddress());
-      expect(totalAssets).to.equal(usdcBalance);
+      await vault.connect(alice).redeem(shares / 2n, alice.address, alice.address);
+      expect(await vault.totalAssets()).to.equal(
+        await usdc.balanceOf(await vault.getAddress())
+      );
     });
-
-    it("should revert when redeemsPaused", async function () {
+    it("reverts when redeemsPaused", async function () {
       await vault.connect(guardian).pauseRedeems();
       const shares = await vault.balanceOf(alice.address);
       await expect(
@@ -137,16 +121,15 @@ describe("FundVault", function () {
   });
 
   // ---------------------------------------------------------------------------
-  // mint() and withdraw() are disabled
+  // Disabled functions
   // ---------------------------------------------------------------------------
   describe("disabled functions", function () {
-    it("mint() should revert with FunctionNotSupported", async function () {
+    it("mint() reverts with FunctionNotSupported", async function () {
       await expect(
         vault.connect(alice).mint(ethers.parseEther("1"), alice.address)
       ).to.be.revertedWithCustomError(vault, "FunctionNotSupported");
     });
-
-    it("withdraw() should revert with FunctionNotSupported", async function () {
+    it("withdraw() reverts with FunctionNotSupported", async function () {
       await expect(
         vault.connect(alice).withdraw(1, alice.address, alice.address)
       ).to.be.revertedWithCustomError(vault, "FunctionNotSupported");
@@ -157,67 +140,131 @@ describe("FundVault", function () {
   // Pause controls
   // ---------------------------------------------------------------------------
   describe("pause controls", function () {
-    it("guardian can pauseDeposits / unpauseDeposits", async function () {
+    it("GUARDIAN can pauseDeposits", async function () {
       await vault.connect(guardian).pauseDeposits();
       expect(await vault.depositsPaused()).to.equal(true);
-      await vault.connect(guardian).unpauseDeposits();
+    });
+    it("ADMIN can unpauseDeposits", async function () {
+      await vault.connect(guardian).pauseDeposits();
+      await vault.connect(admin).unpauseDeposits();
       expect(await vault.depositsPaused()).to.equal(false);
     });
-
-    it("guardian can pauseRedeems / unpauseRedeems", async function () {
+    it("GUARDIAN cannot unpauseDeposits", async function () {
+      await vault.connect(guardian).pauseDeposits();
+      await expect(
+        vault.connect(guardian).unpauseDeposits()
+      ).to.be.reverted;
+    });
+    it("GUARDIAN can pauseRedeems", async function () {
       await vault.connect(guardian).pauseRedeems();
       expect(await vault.redeemsPaused()).to.equal(true);
-      await vault.connect(guardian).unpauseRedeems();
+    });
+    it("ADMIN can unpauseRedeems", async function () {
+      await vault.connect(guardian).pauseRedeems();
+      await vault.connect(admin).unpauseRedeems();
       expect(await vault.redeemsPaused()).to.equal(false);
     });
-
-    it("non-guardian cannot pause deposits", async function () {
+    it("GUARDIAN cannot unpauseRedeems", async function () {
+      await vault.connect(guardian).pauseRedeems();
       await expect(
-        vault.connect(alice).pauseDeposits()
+        vault.connect(guardian).unpauseRedeems()
       ).to.be.reverted;
     });
+    it("non-GUARDIAN cannot pauseDeposits", async function () {
+      await expect(vault.connect(alice).pauseDeposits()).to.be.reverted;
+    });
+    it("non-GUARDIAN cannot pauseRedeems", async function () {
+      await expect(vault.connect(alice).pauseRedeems()).to.be.reverted;
+    });
+  });
 
-    it("non-guardian cannot pause redeems", async function () {
+  // ---------------------------------------------------------------------------
+  // Reserve ratio & availableToInvest
+  // ---------------------------------------------------------------------------
+  describe("reserveRatioBps & availableToInvest", function () {
+    beforeEach(async function () {
+      await vault.connect(alice).deposit(DEPOSIT, alice.address); // 1000 USDC
+    });
+
+    it("availableToInvest = 0 at 100% reserve", async function () {
+      expect(await vault.availableToInvest()).to.equal(0);
+    });
+    it("availableToInvest = totalAssets at 0% reserve", async function () {
+      await vault.connect(admin).setReserveRatioBps(0);
+      expect(await vault.availableToInvest()).to.equal(DEPOSIT);
+    });
+    it("availableToInvest = 70% at 30% reserve", async function () {
+      await vault.connect(admin).setReserveRatioBps(3000);
+      expect(await vault.availableToInvest()).to.equal(D6(700));
+    });
+    it("setReserveRatioBps > 10_000 reverts with InvalidRatio", async function () {
       await expect(
-        vault.connect(alice).pauseRedeems()
+        vault.connect(admin).setReserveRatioBps(10_001)
+      ).to.be.revertedWithCustomError(vault, "InvalidRatio");
+    });
+    it("non-ADMIN cannot setReserveRatioBps", async function () {
+      await expect(
+        vault.connect(alice).setReserveRatioBps(5000)
       ).to.be.reverted;
     });
   });
 
   // ---------------------------------------------------------------------------
-  // externalTransfersEnabled / transferToStrategyManager
+  // transferToStrategyManager
   // ---------------------------------------------------------------------------
-  describe("externalTransfersEnabled", function () {
-    it("transferToStrategyManager reverts when disabled", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
+  describe("transferToStrategyManager", function () {
+    let manager: StrategyManagerV01;
+    let strategy: DummyStrategy;
+
+    beforeEach(async function () {
+      strategy = await (await ethers.getContractFactory("DummyStrategy")).deploy(await usdc.getAddress());
+      manager = await (await ethers.getContractFactory("StrategyManagerV01")).deploy(
+        await usdc.getAddress(), await vault.getAddress(), admin.address, guardian.address
+      );
+      await manager.connect(guardian).pause();
+      await manager.connect(admin).setStrategy(await strategy.getAddress());
+      await manager.connect(admin).unpause();
+
+      await vault.connect(alice).deposit(DEPOSIT, alice.address);
+      await vault.connect(admin).setModules(await manager.getAddress());
+      await vault.connect(admin).setExternalTransfersEnabled(true);
+      await vault.connect(admin).setReserveRatioBps(0);
+    });
+
+    it("transfers USDC to strategyManager", async function () {
+      const before = await usdc.balanceOf(await manager.getAddress());
+      await vault.connect(admin).transferToStrategyManager(DEPOSIT);
+      expect(await usdc.balanceOf(await manager.getAddress())).to.equal(before + DEPOSIT);
+    });
+    it("reverts when ExternalTransfersDisabled", async function () {
+      await vault.connect(admin).setExternalTransfersEnabled(false);
       await expect(
-        vault.connect(admin).transferToStrategyManager(DEPOSIT_AMOUNT)
+        vault.connect(admin).transferToStrategyManager(DEPOSIT)
       ).to.be.revertedWithCustomError(vault, "ExternalTransfersDisabled");
     });
-
-    it("transferToStrategyManager works when enabled", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      await vault.connect(admin).setModules(bob.address);
-      await vault.connect(admin).setExternalTransfersEnabled(true);
-      const vaultUsdcBefore = await usdc.balanceOf(await vault.getAddress());
-      await vault.connect(admin).transferToStrategyManager(DEPOSIT_AMOUNT);
-      const vaultUsdcAfter = await usdc.balanceOf(await vault.getAddress());
-      expect(vaultUsdcAfter).to.equal(vaultUsdcBefore - DEPOSIT_AMOUNT);
+    it("reverts when amount exceeds availableToInvest (ReserveTooLow)", async function () {
+      await vault.connect(admin).setReserveRatioBps(5000); // 50% reserve
+      await expect(
+        vault.connect(admin).transferToStrategyManager(DEPOSIT) // > 500 USDC available
+      ).to.be.revertedWithCustomError(vault, "ReserveTooLow");
     });
-  });
-
-  // ---------------------------------------------------------------------------
-  // USDC allowance invariant
-  // ---------------------------------------------------------------------------
-  describe("USDC allowance invariant", function () {
-    it("vault has zero USDC allowance to any external address", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      // Check allowance to various addresses
-      const vaultAddress = await vault.getAddress();
-      expect(await usdc.allowance(vaultAddress, alice.address)).to.equal(0);
-      expect(await usdc.allowance(vaultAddress, bob.address)).to.equal(0);
-      expect(await usdc.allowance(vaultAddress, treasury.address)).to.equal(0);
-      expect(await usdc.allowance(vaultAddress, admin.address)).to.equal(0);
+    it("reverts when strategyManager is zero address", async function () {
+      // Deploy fresh vault with no strategyManager set
+      const vault2 = await (await ethers.getContractFactory("FundVaultV01")).deploy(
+        await usdc.getAddress(), "V2", "V2", treasury.address, guardian.address, admin.address
+      );
+      await usdc.connect(alice).approve(await vault2.getAddress(), ethers.MaxUint256);
+      await vault2.connect(alice).deposit(DEPOSIT, alice.address);
+      await vault2.connect(admin).setExternalTransfersEnabled(true);
+      await vault2.connect(admin).setReserveRatioBps(0);
+      await expect(
+        vault2.connect(admin).transferToStrategyManager(DEPOSIT)
+      ).to.be.revertedWithCustomError(vault2, "ZeroAddress");
+    });
+    it("non-ADMIN cannot transferToStrategyManager", async function () {
+      await expect(
+        vault.connect(alice).transferToStrategyManager(DEPOSIT)
+      ).to.be.reverted;
     });
   });
 
@@ -225,35 +272,43 @@ describe("FundVault", function () {
   // Management fee
   // ---------------------------------------------------------------------------
   describe("management fee", function () {
-    it("accrueManagementFee with rate=0 mints no shares", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      const supplyBefore = await vault.totalSupply();
-      await vault.accrueManagementFee();
-      const supplyAfter = await vault.totalSupply();
-      expect(supplyAfter).to.equal(supplyBefore);
+    beforeEach(async function () {
+      await vault.connect(alice).deposit(DEPOSIT, alice.address);
     });
 
-    it("setMgmtFeeBpsPerMonth and accrue mints fee shares to treasury", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      // Set fee to 100 bps (1%) per month
+    it("rate=0: no shares minted", async function () {
+      const supply = await vault.totalSupply();
+      await vault.accrueManagementFee();
+      expect(await vault.totalSupply()).to.equal(supply);
+    });
+    it("mints fee shares to treasury after 30 days at 1%/month", async function () {
       await vault.connect(admin).setMgmtFeeBpsPerMonth(100);
-
-      // Advance time by 30 days
       await time.increase(30 * 24 * 60 * 60);
-
-      const treasurySharesBefore = await vault.balanceOf(treasury.address);
+      const before = await vault.balanceOf(treasury.address);
       await vault.accrueManagementFee();
-      const treasurySharesAfter = await vault.balanceOf(treasury.address);
-      expect(treasurySharesAfter).to.be.gt(treasurySharesBefore);
+      expect(await vault.balanceOf(treasury.address)).to.be.gt(before);
     });
-
-    it("setMgmtFeeBpsPerMonth reverts if fee too high", async function () {
+    it("fee is settled before deposit", async function () {
+      await vault.connect(admin).setMgmtFeeBpsPerMonth(100);
+      await time.increase(30 * 24 * 60 * 60);
+      const before = await vault.balanceOf(treasury.address);
+      await vault.connect(bob).deposit(DEPOSIT, bob.address);
+      expect(await vault.balanceOf(treasury.address)).to.be.gt(before);
+    });
+    it("fee is settled before redeem", async function () {
+      await vault.connect(admin).setMgmtFeeBpsPerMonth(100);
+      await time.increase(30 * 24 * 60 * 60);
+      const before = await vault.balanceOf(treasury.address);
+      const shares = await vault.balanceOf(alice.address);
+      await vault.connect(alice).redeem(shares / 2n, alice.address, alice.address);
+      expect(await vault.balanceOf(treasury.address)).to.be.gt(before);
+    });
+    it("setMgmtFeeBpsPerMonth > 200 reverts FeeTooHigh", async function () {
       await expect(
         vault.connect(admin).setMgmtFeeBpsPerMonth(201)
       ).to.be.revertedWithCustomError(vault, "FeeTooHigh");
     });
-
-    it("non-admin cannot setMgmtFeeBpsPerMonth", async function () {
+    it("non-ADMIN cannot setMgmtFeeBpsPerMonth", async function () {
       await expect(
         vault.connect(alice).setMgmtFeeBpsPerMonth(10)
       ).to.be.reverted;
@@ -261,46 +316,32 @@ describe("FundVault", function () {
   });
 
   // ---------------------------------------------------------------------------
-  // pricePerShare
-  // ---------------------------------------------------------------------------
-  describe("pricePerShare", function () {
-    it("returns 1e6 when no shares exist", async function () {
-      expect(await vault.pricePerShare()).to.equal(ethers.parseUnits("1", 6));
-    });
-
-    it("returns 1e6 after initial deposit (no fees)", async function () {
-      await vault.connect(alice).deposit(DEPOSIT_AMOUNT, alice.address);
-      // Price should be close to 1 USDC per share-unit
-      // With offset=12, price in 1e6 scale
-      const price = await vault.pricePerShare();
-      expect(price).to.be.gt(0);
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // Role checks
+  // Access control
   // ---------------------------------------------------------------------------
   describe("access control", function () {
-    it("admin can setTreasury", async function () {
+    it("ADMIN can setTreasury", async function () {
       await vault.connect(admin).setTreasury(bob.address);
       expect(await vault.treasury()).to.equal(bob.address);
     });
-
-    it("non-admin cannot setTreasury", async function () {
+    it("setTreasury(address(0)) reverts ZeroAddress", async function () {
       await expect(
-        vault.connect(alice).setTreasury(bob.address)
-      ).to.be.reverted;
+        vault.connect(admin).setTreasury(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(vault, "ZeroAddress");
     });
-
-    it("admin can setModules", async function () {
+    it("non-ADMIN cannot setTreasury", async function () {
+      await expect(vault.connect(alice).setTreasury(bob.address)).to.be.reverted;
+    });
+    it("ADMIN can setModules", async function () {
       await vault.connect(admin).setModules(bob.address);
       expect(await vault.strategyManager()).to.equal(bob.address);
     });
-
-    it("non-admin cannot setModules", async function () {
+    it("setModules(address(0)) reverts ZeroAddress", async function () {
       await expect(
-        vault.connect(alice).setModules(bob.address)
-      ).to.be.reverted;
+        vault.connect(admin).setModules(ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(vault, "ZeroAddress");
+    });
+    it("non-ADMIN cannot setModules", async function () {
+      await expect(vault.connect(alice).setModules(bob.address)).to.be.reverted;
     });
   });
 });

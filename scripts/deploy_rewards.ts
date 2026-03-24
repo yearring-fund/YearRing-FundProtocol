@@ -1,78 +1,118 @@
+/**
+ * deploy_rewards.ts — Deploy RewardToken + MerkleRewardsDistributorV01
+ *
+ * Reads vault address from existing deployment file produced by deploy.ts.
+ * Transfers full premint from treasury to distributor.
+ *
+ * Usage:
+ *   npx hardhat run scripts/deploy_rewards.ts --network hardhat
+ *   npx hardhat run scripts/deploy_rewards.ts --network baseSepolia
+ *   npx hardhat run scripts/deploy_rewards.ts --network base
+ */
+
 import { ethers, network } from "hardhat";
 import * as fs from "fs";
 import * as path from "path";
 import * as dotenv from "dotenv";
+import { getConfig } from "./config";
 
 dotenv.config();
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  console.log("Deploying rewards contracts with account:", deployer.address);
-  console.log("Network:", network.name);
+  const cfg = getConfig(network.name);
 
+  // ---------------------------------------------------------------------------
   // Load existing deployment
+  // ---------------------------------------------------------------------------
   const deploymentsPath = path.join(__dirname, `../deployments/${network.name}.json`);
   if (!fs.existsSync(deploymentsPath)) {
-    throw new Error(`No deployment found at ${deploymentsPath}. Run deploy.ts first.`);
+    throw new Error(`No deployment at ${deploymentsPath} — run deploy.ts first`);
   }
   const existing = JSON.parse(fs.readFileSync(deploymentsPath, "utf8"));
-  console.log("Loaded existing deployment:", existing.contracts);
 
-  const vaultAddress = existing.contracts.FundVault;
-  const timelockAddress = existing.contracts.TimelockController;
-  const treasury = existing.config.treasury;
-  const guardian = existing.config.guardian;
+  const vaultAddress = existing.contracts.FundVaultV01;
+  const admin        = existing.config.admin;
+  const guardian     = existing.config.guardian;
+  const treasury     = existing.config.treasury;
 
-  // Config
-  const premintAmount = ethers.parseEther("1000000"); // 1M RWD
-  const epochCap = ethers.parseEther("10000");        // 10K RWD per epoch
-  const maxEpochCap = ethers.parseEther("100000");    // 100K RWD max cap
+  if (!vaultAddress) throw new Error("FundVaultV01 address missing in deployment file");
 
-  // 1. Deploy RewardToken
-  const RewardTokenFactory = await ethers.getContractFactory("RewardToken");
-  const rewardToken = await RewardTokenFactory.deploy(
-    "Reward Token",
-    "RWD",
-    premintAmount,
-    treasury,
-    timelockAddress
+  console.log("=".repeat(60));
+  console.log("FinancialBase V01 — Rewards Deployment");
+  console.log("=".repeat(60));
+  console.log("Network  :", network.name);
+  console.log("Deployer :", deployer.address);
+  console.log("Vault    :", vaultAddress);
+  console.log("Admin    :", admin);
+  console.log("Treasury :", treasury);
+  console.log("-".repeat(60));
+
+  // ---------------------------------------------------------------------------
+  // 1. RewardToken
+  // ---------------------------------------------------------------------------
+  const rewardToken = await (await ethers.getContractFactory("RewardToken")).deploy(
+    cfg.rewardTokenName,
+    cfg.rewardTokenSymbol,
+    cfg.rewardPremint,
+    treasury
   );
   await rewardToken.waitForDeployment();
   const rewardTokenAddress = await rewardToken.getAddress();
-  console.log("RewardToken deployed to:", rewardTokenAddress);
+  console.log("RewardToken                  :", rewardTokenAddress);
+  console.log("  Premint                    :", ethers.formatEther(cfg.rewardPremint), cfg.rewardTokenSymbol);
 
-  // 2. Deploy MerkleRewardsDistributor
-  const DistributorFactory = await ethers.getContractFactory("MerkleRewardsDistributor");
-  const distributor = await DistributorFactory.deploy(
+  // ---------------------------------------------------------------------------
+  // 2. MerkleRewardsDistributorV01
+  // ---------------------------------------------------------------------------
+  const distributor = await (await ethers.getContractFactory("MerkleRewardsDistributorV01")).deploy(
     rewardTokenAddress,
     vaultAddress,
-    epochCap,
-    maxEpochCap,
-    timelockAddress, // admin = timelock
-    guardian         // guardian
+    cfg.epochCap,
+    cfg.maxEpochCap,
+    admin,
+    guardian
   );
   await distributor.waitForDeployment();
   const distributorAddress = await distributor.getAddress();
-  console.log("MerkleRewardsDistributor deployed to:", distributorAddress);
+  console.log("MerkleRewardsDistributorV01  :", distributorAddress);
+  console.log("  epochCap                   :", ethers.formatEther(cfg.epochCap), cfg.rewardTokenSymbol);
+  console.log("  maxEpochCap                :", ethers.formatEther(cfg.maxEpochCap), cfg.rewardTokenSymbol);
 
-  // 3. Update deployment file
-  existing.contracts.RewardToken = rewardTokenAddress;
-  existing.contracts.MerkleRewardsDistributor = distributorAddress;
-  existing.config.premintAmount = premintAmount.toString();
-  existing.config.epochCap = epochCap.toString();
-  existing.config.maxEpochCap = maxEpochCap.toString();
+  // ---------------------------------------------------------------------------
+  // 3. Fund distributor (treasury transfers full premint)
+  //    On local: deployer == treasury, can do it automatically
+  //    On mainnet: treasury must sign — print instructions instead
+  // ---------------------------------------------------------------------------
+  const isLocal = network.name === "hardhat" || network.name === "localhost";
+
+  if (isLocal || cfg.useDeployerAsAdmin) {
+    const rt = await ethers.getContractAt("RewardToken", rewardTokenAddress);
+    await (await rt.transfer(distributorAddress, cfg.rewardPremint)).wait();
+    console.log("  Premint transferred to distributor ✓");
+  } else {
+    console.log("\n⚠️  ACTION REQUIRED:");
+    console.log("  Treasury must transfer reward tokens to distributor:");
+    console.log(`  RewardToken.transfer(${distributorAddress}, ${cfg.rewardPremint})`);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 4. Update deployment file
+  // ---------------------------------------------------------------------------
+  existing.contracts.RewardToken                  = rewardTokenAddress;
+  existing.contracts.MerkleRewardsDistributorV01  = distributorAddress;
+  existing.config.rewardPremint                   = cfg.rewardPremint.toString();
+  existing.config.epochCap                        = cfg.epochCap.toString();
+  existing.config.maxEpochCap                     = cfg.maxEpochCap.toString();
 
   fs.writeFileSync(deploymentsPath, JSON.stringify(existing, null, 2));
-  console.log("\nDeployment updated at:", deploymentsPath);
 
-  console.log("\n=== Note ===");
-  console.log("Treasury must approve distributor to transfer reward tokens.");
-  console.log("RewardToken address:", rewardTokenAddress);
-  console.log("Distributor address:", distributorAddress);
-  console.log("Run treasury approve tx before distributing rewards.");
+  console.log("-".repeat(60));
+  console.log("Deployment updated:", deploymentsPath);
+  console.log("\nNext: run build_merkle.ts to generate epoch claims");
 }
 
-main().catch((error) => {
-  console.error(error);
+main().catch((err) => {
+  console.error(err);
   process.exitCode = 1;
 });

@@ -2,115 +2,84 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { MerkleTree } from "merkletreejs";
 import keccak256 from "keccak256";
-import { MerkleRewardsDistributor, RewardToken, FundVault, MockUSDC } from "../typechain-types";
+import { MerkleRewardsDistributorV01, RewardToken, FundVaultV01, MockUSDC } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 // ---------------------------------------------------------------------------
-// Helper: build a Merkle tree from { address, amount } entries
+// Helpers
 // ---------------------------------------------------------------------------
-function buildMerkleTree(entries: { account: string; amount: bigint }[]) {
-  const leaves = entries.map(({ account, amount }) => {
-    const packed = ethers.solidityPacked(["address", "uint256"], [account, amount]);
-    return keccak256(packed);
-  });
+function buildTree(entries: { account: string; amount: bigint }[]) {
+  const leaves = entries.map(({ account, amount }) =>
+    keccak256(ethers.solidityPacked(["address", "uint256"], [account, amount]))
+  );
   const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
   const root = "0x" + tree.getRoot().toString("hex");
   return { tree, root, leaves };
 }
 
-function getProof(
-  tree: MerkleTree,
-  account: string,
-  amount: bigint
-): string[] {
-  const packed = ethers.solidityPacked(["address", "uint256"], [account, amount]);
-  const leaf = keccak256(packed);
-  return tree.getHexProof(leaf);
+function proof(tree: MerkleTree, account: string, amount: bigint): string[] {
+  return tree.getHexProof(
+    keccak256(ethers.solidityPacked(["address", "uint256"], [account, amount]))
+  );
 }
 
 // ---------------------------------------------------------------------------
-describe("MerkleRewardsDistributor", function () {
-  let distributor: MerkleRewardsDistributor;
+describe("MerkleRewardsDistributorV01", function () {
+  let distributor: MerkleRewardsDistributorV01;
   let rewardToken: RewardToken;
-  let vault: FundVault;
+  let vault: FundVaultV01;
   let usdc: MockUSDC;
 
-  let deployer: SignerWithAddress;
-  let timelock: SignerWithAddress; // acts as DEFAULT_ADMIN_ROLE
+  let admin: SignerWithAddress;
   let guardian: SignerWithAddress;
   let treasury: SignerWithAddress;
   let alice: SignerWithAddress;
   let bob: SignerWithAddress;
-  let charlie: SignerWithAddress;
 
-  const EPOCH_CAP = ethers.parseEther("10000");
-  const MAX_EPOCH_CAP = ethers.parseEther("100000");
-  const PREMINT = ethers.parseEther("1000000");
+  const E18 = (n: number) => ethers.parseEther(String(n));
+  const EPOCH_CAP = E18(10_000);
+  const MAX_EPOCH_CAP = E18(100_000);
+  const PREMINT = E18(1_000_000);
 
   beforeEach(async function () {
-    [deployer, timelock, guardian, treasury, alice, bob, charlie] = await ethers.getSigners();
+    [, admin, guardian, treasury, alice, bob] = await ethers.getSigners();
 
-    // Deploy MockUSDC
-    const MockUSDCFactory = await ethers.getContractFactory("MockUSDC");
-    usdc = await MockUSDCFactory.deploy();
-
-    // Deploy FundVault
-    const FundVaultFactory = await ethers.getContractFactory("FundVault");
-    vault = await FundVaultFactory.deploy(
-      await usdc.getAddress(),
-      "Fund Vault",
-      "fvUSDC",
-      treasury.address,
-      guardian.address,
-      timelock.address
+    usdc = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    vault = await (await ethers.getContractFactory("FundVaultV01")).deploy(
+      await usdc.getAddress(), "Fund Vault", "fvUSDC",
+      treasury.address, guardian.address, admin.address
     );
-
-    // Deploy RewardToken (premint to treasury)
-    const RewardTokenFactory = await ethers.getContractFactory("RewardToken");
-    rewardToken = await RewardTokenFactory.deploy(
-      "Reward Token",
-      "RWD",
-      PREMINT,
-      treasury.address,
-      timelock.address
+    rewardToken = await (await ethers.getContractFactory("RewardToken")).deploy(
+      "Reward Token", "RWD", PREMINT, treasury.address
     );
-
-    // Deploy MerkleRewardsDistributor
-    const DistributorFactory = await ethers.getContractFactory("MerkleRewardsDistributor");
-    distributor = await DistributorFactory.deploy(
+    distributor = await (await ethers.getContractFactory("MerkleRewardsDistributorV01")).deploy(
       await rewardToken.getAddress(),
       await vault.getAddress(),
       EPOCH_CAP,
       MAX_EPOCH_CAP,
-      timelock.address,
+      admin.address,
       guardian.address
     );
 
-    // Treasury funds distributor with reward tokens
-    await rewardToken.connect(treasury).transfer(
-      await distributor.getAddress(),
-      PREMINT
-    );
+    // Fund distributor
+    await rewardToken.connect(treasury).transfer(await distributor.getAddress(), PREMINT);
   });
 
   // ---------------------------------------------------------------------------
   // Deployment
   // ---------------------------------------------------------------------------
   describe("Deployment", function () {
-    it("should set rewardToken correctly", async function () {
+    it("rewardToken set correctly", async function () {
       expect(await distributor.rewardToken()).to.equal(await rewardToken.getAddress());
     });
-
-    it("should set fundVault correctly", async function () {
-      expect(await distributor.fundVault()).to.equal(await vault.getAddress());
-    });
-
-    it("should set epochCap correctly", async function () {
+    it("epochCap set correctly", async function () {
       expect(await distributor.epochCap()).to.equal(EPOCH_CAP);
     });
-
-    it("should set maxEpochCap as immutable", async function () {
+    it("maxEpochCap immutable", async function () {
       expect(await distributor.maxEpochCap()).to.equal(MAX_EPOCH_CAP);
+    });
+    it("totalUnclaimed starts at 0", async function () {
+      expect(await distributor.totalUnclaimed()).to.equal(0);
     });
   });
 
@@ -118,46 +87,59 @@ describe("MerkleRewardsDistributor", function () {
   // setEpoch
   // ---------------------------------------------------------------------------
   describe("setEpoch", function () {
-    it("should set epoch successfully", async function () {
-      const entries = [
-        { account: alice.address, amount: ethers.parseEther("100") },
-        { account: bob.address, amount: ethers.parseEther("200") },
-      ];
-      const { root } = buildMerkleTree(entries);
-      const epochTotal = ethers.parseEther("300");
-      const now = Math.floor(Date.now() / 1000);
-
-      await distributor.connect(timelock).setEpoch(1, root, epochTotal, now, now + 86400);
+    it("sets epoch and increments totalUnclaimed", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: E18(100) }]);
+      await distributor.connect(admin).setEpoch(1, root, E18(100));
       const epoch = await distributor.epochs(1);
-      expect(epoch.root).to.equal(root);
-      expect(epoch.epochTotal).to.equal(epochTotal);
       expect(epoch.exists).to.equal(true);
+      expect(epoch.epochTotal).to.equal(E18(100));
+      expect(await distributor.totalUnclaimed()).to.equal(E18(100));
     });
-
-    it("should revert if epochId already exists", async function () {
-      const { root } = buildMerkleTree([{ account: alice.address, amount: ethers.parseEther("100") }]);
-      const now = Math.floor(Date.now() / 1000);
-      await distributor.connect(timelock).setEpoch(1, root, ethers.parseEther("100"), now, now + 86400);
-
+    it("root = bytes32(0) reverts InvalidRoot", async function () {
       await expect(
-        distributor.connect(timelock).setEpoch(1, root, ethers.parseEther("100"), now, now + 86400)
-      ).to.be.revertedWithCustomError(distributor, "EpochAlreadyExists");
+        distributor.connect(admin).setEpoch(1, ethers.ZeroHash, E18(100))
+      ).to.be.revertedWithCustomError(distributor, "InvalidRoot");
     });
-
-    it("should revert if epochTotal exceeds epochCap", async function () {
-      const { root } = buildMerkleTree([{ account: alice.address, amount: EPOCH_CAP + BigInt(1) }]);
-      const now = Math.floor(Date.now() / 1000);
-
+    it("epochTotal = 0 reverts InvalidEpochTotal", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: E18(100) }]);
       await expect(
-        distributor.connect(timelock).setEpoch(1, root, EPOCH_CAP + BigInt(1), now, now + 86400)
+        distributor.connect(admin).setEpoch(1, root, 0)
+      ).to.be.revertedWithCustomError(distributor, "InvalidEpochTotal");
+    });
+    it("epochTotal > epochCap reverts EpochTotalExceedsCap", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: EPOCH_CAP + 1n }]);
+      await expect(
+        distributor.connect(admin).setEpoch(1, root, EPOCH_CAP + 1n)
       ).to.be.revertedWithCustomError(distributor, "EpochTotalExceedsCap");
     });
-
-    it("should revert if non-admin calls setEpoch", async function () {
-      const { root } = buildMerkleTree([{ account: alice.address, amount: ethers.parseEther("100") }]);
-      const now = Math.floor(Date.now() / 1000);
+    it("duplicate epochId reverts EpochAlreadyExists", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: E18(100) }]);
+      await distributor.connect(admin).setEpoch(1, root, E18(100));
       await expect(
-        distributor.connect(alice).setEpoch(1, root, ethers.parseEther("100"), now, now + 86400)
+        distributor.connect(admin).setEpoch(1, root, E18(100))
+      ).to.be.revertedWithCustomError(distributor, "EpochAlreadyExists");
+    });
+    it("insufficient balance reverts InsufficientRewardBalance", async function () {
+      // Deploy a fresh distributor and fund it exactly EPOCH_CAP from the main distributor
+      const smallDist = await (await ethers.getContractFactory("MerkleRewardsDistributorV01")).deploy(
+        await rewardToken.getAddress(), await vault.getAddress(),
+        EPOCH_CAP, MAX_EPOCH_CAP, admin.address, guardian.address
+      );
+      // Transfer EPOCH_CAP tokens from main distributor (surplus = full balance since no epochs set)
+      await distributor.connect(admin).rescueTokens(await smallDist.getAddress(), EPOCH_CAP);
+
+      const { root } = buildTree([{ account: alice.address, amount: EPOCH_CAP }]);
+      await smallDist.connect(admin).setEpoch(1, root, EPOCH_CAP);
+
+      const { root: root2 } = buildTree([{ account: bob.address, amount: E18(1) }]);
+      await expect(
+        smallDist.connect(admin).setEpoch(2, root2, E18(1))
+      ).to.be.revertedWithCustomError(smallDist, "InsufficientRewardBalance");
+    });
+    it("non-ADMIN cannot setEpoch", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: E18(100) }]);
+      await expect(
+        distributor.connect(alice).setEpoch(1, root, E18(100))
       ).to.be.reverted;
     });
   });
@@ -166,191 +148,241 @@ describe("MerkleRewardsDistributor", function () {
   // claim
   // ---------------------------------------------------------------------------
   describe("claim", function () {
-    const aliceAmount = ethers.parseEther("300");
-    const bobAmount = ethers.parseEther("700");
-    const epochTotal = aliceAmount + bobAmount;
-    const epochId = 1;
+    const aliceAmt = E18(300);
+    const bobAmt = E18(700);
+    const epochTotal = aliceAmt + bobAmt;
     let tree: MerkleTree;
     let root: string;
 
     beforeEach(async function () {
-      const entries = [
-        { account: alice.address, amount: aliceAmount },
-        { account: bob.address, amount: bobAmount },
-      ];
-      ({ tree, root } = buildMerkleTree(entries));
-      const now = Math.floor(Date.now() / 1000);
-      await distributor.connect(timelock).setEpoch(epochId, root, epochTotal, now, now + 86400);
+      ({ tree, root } = buildTree([
+        { account: alice.address, amount: aliceAmt },
+        { account: bob.address, amount: bobAmt },
+      ]));
+      await distributor.connect(admin).setEpoch(1, root, epochTotal);
     });
 
-    it("alice can claim full amount", async function () {
-      const proof = getProof(tree, alice.address, aliceAmount);
-      const balBefore = await rewardToken.balanceOf(alice.address);
-      await distributor.claim(epochId, alice.address, aliceAmount, proof);
-      const balAfter = await rewardToken.balanceOf(alice.address);
-      expect(balAfter - balBefore).to.equal(aliceAmount);
+    it("alice claims full amount", async function () {
+      const before = await rewardToken.balanceOf(alice.address);
+      await distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt));
+      expect(await rewardToken.balanceOf(alice.address)).to.equal(before + aliceAmt);
     });
-
-    it("bob can claim full amount", async function () {
-      const proof = getProof(tree, bob.address, bobAmount);
-      await distributor.claim(epochId, bob.address, bobAmount, proof);
-      expect(await rewardToken.balanceOf(bob.address)).to.equal(bobAmount);
+    it("totalUnclaimed decreases after claim", async function () {
+      await distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt));
+      expect(await distributor.totalUnclaimed()).to.equal(epochTotal - aliceAmt);
     });
-
-    it("incremental claim: two partial claims sum to full amount", async function () {
-      const proof = getProof(tree, alice.address, aliceAmount);
-
-      // First claim: only send partial — but since leaf encodes total,
-      // the first call must claim full amount minus previously claimed.
-      // To test incremental, we simulate by calling twice:
-      // First call gets full amount (nothing claimed yet)
-      await distributor.claim(epochId, alice.address, aliceAmount, proof);
-      const bal1 = await rewardToken.balanceOf(alice.address);
-      expect(bal1).to.equal(aliceAmount);
-
-      // Second call: claimable = 0 → NothingToClaim
+    it("incremental claim: second claim on same epoch reverts NothingToClaim", async function () {
+      // Once the full leaf amount is claimed, a second call reverts
+      await distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt));
       await expect(
-        distributor.claim(epochId, alice.address, aliceAmount, proof)
+        distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt))
       ).to.be.revertedWithCustomError(distributor, "NothingToClaim");
     });
+    it("cross-epoch cumulative: epoch 2 leaf covers epoch 1 amount, delta is sent", async function () {
+      // Epoch 2 tree encodes alice's cumulative entitlement (aliceAmt already in epoch 1)
+      const cumulative = aliceAmt + E18(100);
+      const { tree: t2, root: r2 } = buildTree([
+        { account: alice.address, amount: cumulative },
+        { account: bob.address, amount: bobAmt },
+      ]);
+      await distributor.connect(admin).setEpoch(2, r2, cumulative + bobAmt);
 
-    it("repeated claim by same account → NothingToClaim", async function () {
-      const proof = getProof(tree, alice.address, aliceAmount);
-      await distributor.claim(epochId, alice.address, aliceAmount, proof);
+      // Alice claims full cumulative from epoch 2 (claimed[2][alice] starts at 0)
+      const before = await rewardToken.balanceOf(alice.address);
+      await distributor.claim(2, alice.address, cumulative, proof(t2, alice.address, cumulative));
+      expect(await rewardToken.balanceOf(alice.address)).to.equal(before + cumulative);
+    });
+    it("already fully claimed reverts NothingToClaim", async function () {
+      await distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt));
       await expect(
-        distributor.claim(epochId, alice.address, aliceAmount, proof)
+        distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt))
       ).to.be.revertedWithCustomError(distributor, "NothingToClaim");
     });
-
-    it("invalid proof → InvalidMerkleProof", async function () {
-      const proof = getProof(tree, alice.address, aliceAmount);
+    it("invalid proof reverts InvalidMerkleProof", async function () {
       await expect(
-        distributor.claim(epochId, bob.address, aliceAmount, proof) // wrong account
+        distributor.claim(1, bob.address, aliceAmt, proof(tree, alice.address, aliceAmt))
       ).to.be.revertedWithCustomError(distributor, "InvalidMerkleProof");
     });
-
-    it("epoch does not exist → EpochDoesNotExist", async function () {
-      const proof = getProof(tree, alice.address, aliceAmount);
+    it("non-existent epoch reverts EpochDoesNotExist", async function () {
       await expect(
-        distributor.claim(999, alice.address, aliceAmount, proof)
+        distributor.claim(999, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt))
       ).to.be.revertedWithCustomError(distributor, "EpochDoesNotExist");
     });
+    it("expired epoch reverts EpochExpiredCannotClaim", async function () {
+      await distributor.connect(admin).expireEpoch(1);
+      await expect(
+        distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt))
+      ).to.be.revertedWithCustomError(distributor, "EpochExpiredCannotClaim");
+    });
+    it("paused reverts", async function () {
+      await distributor.connect(guardian).pause();
+      await expect(
+        distributor.claim(1, alice.address, aliceAmt, proof(tree, alice.address, aliceAmt))
+      ).to.be.revertedWith("Pausable: paused");
+    });
+  });
 
-    it("claim does not change vault USDC balance", async function () {
-      // Deposit some USDC into vault
-      await usdc.mint(alice.address, ethers.parseUnits("1000", 6));
-      await usdc.connect(alice).approve(await vault.getAddress(), ethers.MaxUint256);
-      await vault.connect(alice).deposit(ethers.parseUnits("1000", 6), alice.address);
-
-      const vaultUsdcBefore = await usdc.balanceOf(await vault.getAddress());
-      const proof = getProof(tree, alice.address, aliceAmount);
-      await distributor.claim(epochId, alice.address, aliceAmount, proof);
-      const vaultUsdcAfter = await usdc.balanceOf(await vault.getAddress());
-
-      expect(vaultUsdcAfter).to.equal(vaultUsdcBefore);
+  // ---------------------------------------------------------------------------
+  // expireEpoch
+  // ---------------------------------------------------------------------------
+  describe("expireEpoch", function () {
+    beforeEach(async function () {
+      const { root } = buildTree([
+        { account: alice.address, amount: E18(300) },
+        { account: bob.address, amount: E18(700) },
+      ]);
+      await distributor.connect(admin).setEpoch(1, root, E18(1000));
     });
 
-    it("claimedTotal invariant: cannot exceed epochTotal", async function () {
-      // Build tree where single account claims epochTotal
-      const bigAmount = epochTotal;
-      const entries2 = [
-        { account: alice.address, amount: bigAmount },
-      ];
-      const { tree: tree2, root: root2 } = buildMerkleTree(entries2);
-      const now = Math.floor(Date.now() / 1000);
-      await distributor.connect(timelock).setEpoch(2, root2, bigAmount, now, now + 86400);
+    it("releases unclaimed from totalUnclaimed", async function () {
+      // alice claims 300
+      const { tree } = buildTree([
+        { account: alice.address, amount: E18(300) },
+        { account: bob.address, amount: E18(700) },
+      ]);
+      await distributor.claim(1, alice.address, E18(300), proof(tree, alice.address, E18(300)));
+      const before = await distributor.totalUnclaimed();
+      await distributor.connect(admin).expireEpoch(1);
+      // released = epochTotal(1000) - claimedTotal(300) = 700
+      expect(await distributor.totalUnclaimed()).to.equal(before - E18(700));
+    });
+    it("already expired reverts EpochAlreadyExpired", async function () {
+      await distributor.connect(admin).expireEpoch(1);
+      await expect(
+        distributor.connect(admin).expireEpoch(1)
+      ).to.be.revertedWithCustomError(distributor, "EpochAlreadyExpired");
+    });
+    it("non-existent epoch reverts EpochDoesNotExist", async function () {
+      await expect(
+        distributor.connect(admin).expireEpoch(999)
+      ).to.be.revertedWithCustomError(distributor, "EpochDoesNotExist");
+    });
+    it("non-ADMIN cannot expireEpoch", async function () {
+      await expect(distributor.connect(alice).expireEpoch(1)).to.be.reverted;
+    });
+  });
 
-      const proof2 = getProof(tree2, alice.address, bigAmount);
-      await distributor.claim(2, alice.address, bigAmount, proof2);
+  // ---------------------------------------------------------------------------
+  // rescueTokens
+  // ---------------------------------------------------------------------------
+  describe("rescueTokens", function () {
+    // Use a tightly-funded distributor so surplus is predictable
+    let tinyDist: MerkleRewardsDistributorV01;
+    const TINY = E18(100);
 
-      // All claimed — try overflow with a different tree setup not possible
-      // Instead verify epoch claimedTotal == epochTotal
-      const epoch = await distributor.epochs(2);
-      expect(epoch.claimedTotal).to.equal(bigAmount);
+    beforeEach(async function () {
+      tinyDist = await (await ethers.getContractFactory("MerkleRewardsDistributorV01")).deploy(
+        await rewardToken.getAddress(), await vault.getAddress(),
+        EPOCH_CAP, MAX_EPOCH_CAP, admin.address, guardian.address
+      );
+      // Fund tinyDist from main distributor surplus (no epochs set yet, all balance is surplus)
+      await distributor.connect(admin).rescueTokens(await tinyDist.getAddress(), TINY);
+    });
+
+    it("rescues surplus tokens after epoch expiry", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: TINY }]);
+      await tinyDist.connect(admin).setEpoch(1, root, TINY);
+      await tinyDist.connect(admin).expireEpoch(1); // releases TINY to surplus
+
+      const before = await rewardToken.balanceOf(alice.address);
+      await tinyDist.connect(admin).rescueTokens(alice.address, TINY);
+      expect(await rewardToken.balanceOf(alice.address)).to.equal(before + TINY);
+    });
+    it("caps transfer at surplus if amount > surplus", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: TINY }]);
+      await tinyDist.connect(admin).setEpoch(1, root, TINY);
+      await tinyDist.connect(admin).expireEpoch(1); // surplus = TINY
+
+      const before = await rewardToken.balanceOf(alice.address);
+      await tinyDist.connect(admin).rescueTokens(alice.address, TINY * 999n); // >> surplus
+      expect(await rewardToken.balanceOf(alice.address)).to.equal(before + TINY);
+    });
+    it("to = address(0) reverts ZeroAddress", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: TINY }]);
+      await tinyDist.connect(admin).setEpoch(1, root, TINY);
+      await tinyDist.connect(admin).expireEpoch(1);
+      await expect(
+        tinyDist.connect(admin).rescueTokens(ethers.ZeroAddress, TINY)
+      ).to.be.revertedWithCustomError(tinyDist, "ZeroAddress");
+    });
+    it("no surplus reverts NothingToRescue", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: TINY }]);
+      await tinyDist.connect(admin).setEpoch(1, root, TINY);
+      // totalUnclaimed = balance → surplus = 0
+      await expect(
+        tinyDist.connect(admin).rescueTokens(alice.address, E18(1))
+      ).to.be.revertedWithCustomError(tinyDist, "NothingToRescue");
+    });
+    it("non-ADMIN cannot rescueTokens", async function () {
+      await expect(
+        distributor.connect(alice).rescueTokens(alice.address, E18(1))
+      ).to.be.reverted;
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // claimable view
+  // ---------------------------------------------------------------------------
+  describe("claimable", function () {
+    it("returns correct amount before claim", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: E18(100) }]);
+      await distributor.connect(admin).setEpoch(1, root, E18(100));
+      expect(await distributor.claimable(1, alice.address, E18(100))).to.equal(E18(100));
+    });
+    it("returns 0 after full claim", async function () {
+      const { tree, root } = buildTree([{ account: alice.address, amount: E18(100) }]);
+      await distributor.connect(admin).setEpoch(1, root, E18(100));
+      await distributor.claim(1, alice.address, E18(100), proof(tree, alice.address, E18(100)));
+      expect(await distributor.claimable(1, alice.address, E18(100))).to.equal(0);
+    });
+    it("returns 0 for non-existent epoch", async function () {
+      expect(await distributor.claimable(999, alice.address, E18(100))).to.equal(0);
+    });
+    it("returns 0 for expired epoch", async function () {
+      const { root } = buildTree([{ account: alice.address, amount: E18(100) }]);
+      await distributor.connect(admin).setEpoch(1, root, E18(100));
+      await distributor.connect(admin).expireEpoch(1);
+      expect(await distributor.claimable(1, alice.address, E18(100))).to.equal(0);
     });
   });
 
   // ---------------------------------------------------------------------------
   // Pause
   // ---------------------------------------------------------------------------
-  describe("pause", function () {
-    it("guardian can pause and unpause", async function () {
+  describe("pause controls", function () {
+    it("GUARDIAN can pause", async function () {
       await distributor.connect(guardian).pause();
       expect(await distributor.paused()).to.equal(true);
-      await distributor.connect(guardian).unpause();
+    });
+    it("ADMIN can unpause", async function () {
+      await distributor.connect(guardian).pause();
+      await distributor.connect(admin).unpause();
       expect(await distributor.paused()).to.equal(false);
     });
-
-    it("claim reverts when paused", async function () {
-      const entries = [{ account: alice.address, amount: ethers.parseEther("100") }];
-      const { tree, root } = buildMerkleTree(entries);
-      const now = Math.floor(Date.now() / 1000);
-      await distributor.connect(timelock).setEpoch(1, root, ethers.parseEther("100"), now, now + 86400);
-
+    it("GUARDIAN cannot unpause", async function () {
       await distributor.connect(guardian).pause();
-      const proof = getProof(tree, alice.address, ethers.parseEther("100"));
-      await expect(
-        distributor.claim(1, alice.address, ethers.parseEther("100"), proof)
-      ).to.be.revertedWith("Pausable: paused");
+      await expect(distributor.connect(guardian).unpause()).to.be.reverted;
     });
-
-    it("non-guardian cannot pause", async function () {
+    it("non-GUARDIAN cannot pause", async function () {
       await expect(distributor.connect(alice).pause()).to.be.reverted;
     });
   });
 
   // ---------------------------------------------------------------------------
-  // epochCap adjustment
+  // setEpochCap
   // ---------------------------------------------------------------------------
-  describe("epochCap", function () {
-    it("admin (timelock) can reduce epochCap", async function () {
-      const newCap = ethers.parseEther("5000");
-      await distributor.connect(timelock).setEpochCap(newCap);
-      expect(await distributor.epochCap()).to.equal(newCap);
+  describe("setEpochCap", function () {
+    it("ADMIN can reduce cap", async function () {
+      await distributor.connect(admin).setEpochCap(E18(5000));
+      expect(await distributor.epochCap()).to.equal(E18(5000));
     });
-
-    it("cannot set epochCap > maxEpochCap", async function () {
+    it("cap > maxEpochCap reverts EpochCapExceedsMax", async function () {
       await expect(
-        distributor.connect(timelock).setEpochCap(MAX_EPOCH_CAP + BigInt(1))
+        distributor.connect(admin).setEpochCap(MAX_EPOCH_CAP + 1n)
       ).to.be.revertedWithCustomError(distributor, "EpochCapExceedsMax");
     });
-
-    it("non-admin cannot setEpochCap", async function () {
-      await expect(
-        distributor.connect(alice).setEpochCap(ethers.parseEther("5000"))
-      ).to.be.reverted;
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // claimable() view
-  // ---------------------------------------------------------------------------
-  describe("claimable view", function () {
-    it("returns correct claimable amount before claim", async function () {
-      const amount = ethers.parseEther("100");
-      const entries = [{ account: alice.address, amount }];
-      const { root } = buildMerkleTree(entries);
-      const now = Math.floor(Date.now() / 1000);
-      await distributor.connect(timelock).setEpoch(1, root, amount, now, now + 86400);
-
-      expect(await distributor.claimable(1, alice.address, amount)).to.equal(amount);
-    });
-
-    it("returns 0 for non-existent epoch", async function () {
-      expect(await distributor.claimable(999, alice.address, ethers.parseEther("100"))).to.equal(0);
-    });
-
-    it("returns 0 after full claim", async function () {
-      const amount = ethers.parseEther("100");
-      const entries = [{ account: alice.address, amount }];
-      const { tree, root } = buildMerkleTree(entries);
-      const now = Math.floor(Date.now() / 1000);
-      await distributor.connect(timelock).setEpoch(1, root, amount, now, now + 86400);
-
-      const proof = getProof(tree, alice.address, amount);
-      await distributor.claim(1, alice.address, amount, proof);
-
-      expect(await distributor.claimable(1, alice.address, amount)).to.equal(0);
+    it("non-ADMIN cannot setEpochCap", async function () {
+      await expect(distributor.connect(alice).setEpochCap(E18(1))).to.be.reverted;
     });
   });
 });
