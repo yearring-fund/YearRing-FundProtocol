@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-03-27T23:47:41.965Z",
+  "snapshot": {
+    "totalTVL": "4500000000",
+    "totalTVL_formatted": "4500.00 USDC",
+    "totalLockedShares": "3500000000000000000000",
+    "totalLockedShares_formatted": "3500.0000 fbUSDC",
+    "lockedRatioBps": "7777",
+    "lockedRatio_pct": "77.77%",
+    "totalLocksEver": "4"
+  },
+  "tierBreakdown": {
+    "byCount": {
+      "Bronze": 1,
+      "Silver": 1,
+      "Gold": 1
+    },
+    "byShares": {
+      "Bronze": "1000000000000000000000",
+      "Bronze_formatted": "1000.0000 fbUSDC",
+      "Silver": "2000000000000000000000",
+      "Silver_formatted": "2000.0000 fbUSDC",
+      "Gold": "500000000000000000000",
+      "Gold_formatted": "500.0000 fbUSDC"
+    }
+  },
+  "lifecycleStats": {
+    "activeLocks": 3,
+    "earlyExitCount": 1,
+    "normalUnlocked": 0,
+    "maturedNotUnlocked": 0,
+    "totalActivePoints": "900000000",
+    "totalActivePoints_formatted": "900.00 pts"
+  }
+}

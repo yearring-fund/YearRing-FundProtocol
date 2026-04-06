@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>YearRing-FundProtocol — v02 — Base Mainnet</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;
+  --blue:#58a6ff;--green:#3fb950;--yellow:#e3b341;--red:#f85149;--orange:#f0883e;
+  --r:8px;--font:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:10}
+.header-left h1{font-size:17px;font-weight:700;color:var(--blue)}
+.subtitle{font-size:11px;color:var(--muted);margin-top:2px}
+.phase-badge{display:inline-block;font-size:11px;padding:2px 10px;border-radius:12px;background:#2d1f00;color:var(--yellow);border:1px solid #4a3000;margin-top:4px}
+#connect-btn{padding:7px 16px;border-radius:6px;font-size:13px;font-weight:600;background:var(--blue);color:#000;border:none;cursor:pointer}
+#connect-btn:hover{opacity:.85}
+#wallet-display{display:flex;align-items:center;gap:10px}
+.wallet-addr{font-family:monospace;font-size:12px;color:var(--muted)}
+#disconnect-btn{padding:4px 10px;font-size:12px;border-radius:6px;background:#21262d;color:var(--text);border:1px solid var(--border);cursor:pointer}
+.net-badge{font-size:11px;padding:2px 8px;border-radius:12px;background:#0d2310;color:var(--green);border:1px solid #1a4a20}
+.container{max-width:1000px;margin:0 auto;padding:24px}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+.section h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.allowlist-banner{border:1px solid var(--orange);border-radius:var(--r);background:#1a0f00;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:flex-start}
+.allowlist-banner .icon{font-size:18px;line-height:1}
+.allowlist-banner .title{font-weight:600;font-size:13px;color:var(--orange)}
+.allowlist-banner .desc{font-size:12px;color:var(--muted);margin-top:3px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px}
+.card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.card .value{font-size:20px;font-weight:700;margin-top:4px}
+.card .sub{font-size:11px;color:var(--muted);margin-top:3px}
+.pills{display:flex;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:12px;font-weight:500}
+.pill .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.pill.ok{background:#0d2310;color:var(--green);border:1px solid #1a4a20}.pill.ok .dot{background:var(--green)}
+.pill.warn{background:#2d1f00;color:var(--yellow);border:1px solid #4a3000}.pill.warn .dot{background:var(--yellow)}
+.pill.err{background:#2d0b0b;color:var(--red);border:1px solid #5c1010}.pill.err .dot{background:var(--red)}
+.pill.gray{background:#1c2026;color:var(--muted);border:1px solid var(--border)}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px;border-bottom:1px solid #1c2026}
+.info-row:last-child{border-bottom:none}
+.info-label{color:var(--muted);font-size:12px}.info-value{font-weight:500}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:600px){.action-grid{grid-template-columns:1fr}}
+.action-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.action-title{font-size:13px;font-weight:600;margin-bottom:12px}
+.input-row{display:flex;gap:8px;margin-bottom:6px}
+.input-row input,.input-row input[type=text]{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;font-family:var(--font)}
+.input-row input:focus{outline:none;border-color:var(--blue)}
+.max-btn,.pct-btn{padding:5px 10px;font-size:12px;border-radius:6px;background:#21262d;color:var(--text);border:1px solid var(--border);cursor:pointer;white-space:nowrap}
+.pct-btns{display:flex;gap:6px;margin-bottom:8px}
+.preview-line{font-size:12px;color:var(--muted);margin-bottom:8px;min-height:18px}
+.action-warn{font-size:12px;color:var(--yellow);margin-bottom:6px;min-height:16px}
+.btn-full{width:100%;padding:9px;border-radius:6px;font-size:13px;font-weight:600;background:#238636;color:#fff;border:none;cursor:pointer}
+.btn-full:hover:not(:disabled){background:#2ea043}
+.btn-full:disabled{background:#21262d;color:var(--muted);cursor:not-allowed}
+.btn-secondary-full{width:100%;padding:9px;border-radius:6px;font-size:13px;font-weight:500;background:#21262d;color:var(--text);border:1px solid var(--border);cursor:pointer;margin-top:6px}
+.btn-secondary-full:hover:not(:disabled){background:#2d333b}
+.btn-secondary-full:disabled{opacity:.4;cursor:not-allowed}
+.status{font-size:12px;margin-top:8px;min-height:18px;word-break:break-word}
+.status.ok{color:var(--green)}.status.err{color:var(--red)}.status.info{color:var(--blue)}
+.tier-btns{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.tier-btn{flex:1;min-width:120px;padding:12px;border-radius:8px;text-align:center;border:2px solid var(--border);background:var(--bg);color:var(--text);cursor:pointer}
+.tier-btn .tier-name{font-size:13px;font-weight:700}
+.tier-btn .tier-info{font-size:11px;color:var(--muted);margin-top:3px}
+.tier-btn.selected{border-color:var(--blue);background:#0d2641}
+.tier-btn.selected .tier-info{color:var(--blue)}
+.preview-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:12px;display:none}
+.preview-block.show{display:block}
+.position-card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px}
+.position-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.position-title{font-size:13px;font-weight:600}
+.position-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn-sm{padding:5px 12px;font-size:12px;border-radius:6px;cursor:pointer;font-weight:500;border:1px solid var(--border)}
+.btn-sm.green{background:#0d2310;color:var(--green);border-color:#1a4a20}
+.btn-sm.blue{background:#0d2641;color:var(--blue);border-color:#1c4070}
+.btn-sm.red{background:#2d0b0b;color:var(--red);border-color:#5c1010}
+.btn-sm:disabled{opacity:.4;cursor:not-allowed}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:500}
+.badge-bronze{background:#2d1900;color:#e8a44a;border:1px solid #5c3000}
+.badge-silver{background:#1a1f2b;color:#a8b8d0;border:1px solid #2d3d52}
+.badge-gold{background:#2d2200;color:var(--yellow);border:1px solid #5c4400}
+.badge-settled{background:#1c2026;color:var(--muted);border:1px solid var(--border)}
+.badge-accumulating{background:#0d2310;color:var(--green);border:1px solid #1a4a20}
+.badge-matured{background:#0d2641;color:var(--blue);border:1px solid #1c4070}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:var(--muted);font-weight:500;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:6px 8px;border-bottom:1px solid #1c2026}
+td:first-child{font-family:var(--font);color:var(--text)}
+tr:last-child td{border-bottom:none}
+.risk-disclaimer{border-left:3px solid var(--orange);background:#1a0f00;border-radius:0 var(--r) var(--r) 0;padding:16px 18px;margin-bottom:16px}
+.risk-disclaimer h3{font-size:13px;color:var(--orange);margin-bottom:10px}
+.risk-disclaimer ul{padding-left:18px;color:var(--muted);font-size:12px;line-height:1.8}
+.version-footer{text-align:center;padding:20px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+.version-footer strong{color:var(--text)}
+#net-alert{background:#2d1f00;border-bottom:1px solid var(--yellow);color:var(--yellow);text-align:center;padding:10px;font-size:13px;display:none}
+#net-alert button{margin-left:12px;padding:4px 12px;border-radius:6px;background:var(--yellow);color:#000;border:none;cursor:pointer;font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>YearRing-FundProtocol</h1>
+    <div class="subtitle">FinancialBase Protocol · Base Mainnet · v02</div>
+    <div class="phase-badge">● STEP 4 · INVITED USER ACCESS</div>
+  </div>
+  <div id="wallet-area">
+    <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+    <div id="wallet-display" style="display:none">
+      <span class="net-badge">Base Mainnet</span>
+      <span class="wallet-addr" id="wallet-addr-text"></span>
+      <button id="disconnect-btn" onclick="disconnectWallet()">Disconnect</button>
+    </div>
+  </div>
+</header>
+
+<div id="net-alert">
+  Wrong network — please switch to Base Mainnet (Chain ID 8453).
+  <button onclick="switchNetwork()">Switch Network</button>
+</div>
+
+<div class="container">
+
+  <div class="allowlist-banner">
+    <div class="icon">🔒</div>
+    <div>
+      <div class="title">Allowlist / Invitation Mode</div>
+      <div class="desc">Deposits require prior approval from the fund admin. This is not a public product. Lock, beneficiary, and governance features are available to all connected wallets.</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="cards">
+    <div class="card"><div class="label">Vault Total Assets</div><div class="value" id="stat-tvl">—</div><div class="sub">USDC managed by vault</div></div>
+    <div class="card"><div class="label">Price Per Share</div><div class="value" id="stat-pps">—</div><div class="sub">USDC per fbUSDC</div></div>
+    <div class="card"><div class="label">Lock Rate</div><div class="value" id="stat-lockrate">—</div><div class="sub">of total shares locked</div></div>
+    <div class="card"><div class="label">Total Locks Ever</div><div class="value" id="stat-locks">—</div><div class="sub">cumulative positions</div></div>
+  </div>
+
+  <!-- System Status -->
+  <div class="section">
+    <h2>System Status</h2>
+    <div class="pills" id="status-pills"><span class="pill gray"><span class="dot"></span>Loading…</span></div>
+  </div>
+
+  <!-- Your Position -->
+  <div class="section">
+    <h2>Your Position</h2>
+    <div id="position-disconnected" style="color:var(--muted);font-size:13px">Connect your wallet to view your position.</div>
+    <div id="position-connected" style="display:none">
+      <div style="margin-bottom:12px">
+        <div class="info-row"><span class="info-label">Wallet USDC</span><span class="info-value" id="pos-usdc">—</span></div>
+        <div class="info-row"><span class="info-label">fbUSDC (Total)</span><span class="info-value" id="pos-shares-total">—</span></div>
+        <div class="info-row"><span class="info-label">fbUSDC (Free / Locked)</span><span class="info-value" id="pos-shares-split">—</span></div>
+        <div class="info-row"><span class="info-label">RWT Balance</span><span class="info-value" id="pos-rwt">—</span></div>
+        <div class="info-row"><span class="info-label">Active Locks</span><span class="info-value" id="pos-lockcount">—</span></div>
+      </div>
+      <div class="pills" id="pos-pills"></div>
+      <button onclick="loadUserData(userAddress)" style="margin-top:12px;padding:5px 14px;font-size:12px;border-radius:6px;background:#21262d;color:var(--text);border:1px solid var(--border);cursor:pointer">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Deposit / Redeem -->
+  <div class="action-grid">
+    <div class="action-panel">
+      <div class="action-title">Deposit USDC → fbUSDC</div>
+      <div class="input-row">
+        <input id="deposit-amount" type="number" placeholder="USDC amount" min="0" step="0.01" oninput="onDepositInput()" />
+        <button class="max-btn" onclick="setDepositMax()">Max</button>
+      </div>
+      <div class="preview-line" id="deposit-preview">≈ — fbUSDC</div>
+      <div class="action-warn" id="deposit-warn"></div>
+      <button class="btn-full" id="deposit-btn" onclick="doDeposit()" disabled>Approve & Deposit</button>
+      <div class="status" id="deposit-status"></div>
+    </div>
+    <div class="action-panel">
+      <div class="action-title">Redeem fbUSDC → USDC</div>
+      <div class="input-row">
+        <input id="redeem-shares" type="number" placeholder="fbUSDC shares" min="0" step="0.000001" oninput="onRedeemInput()" />
+        <button class="max-btn" onclick="setRedeemMax()">Max</button>
+      </div>
+      <div class="pct-btns">
+        <button class="pct-btn" onclick="setRedeemPct(25)">25%</button>
+        <button class="pct-btn" onclick="setRedeemPct(50)">50%</button>
+        <button class="pct-btn" onclick="setRedeemPct(100)">100%</button>
+      </div>
+      <div class="preview-line" id="redeem-preview">≈ — USDC</div>
+      <div class="action-warn" id="redeem-warn"></div>
+      <button class="btn-full" id="redeem-btn" onclick="doRedeem()" disabled>Redeem</button>
+      <div class="status" id="redeem-status"></div>
+    </div>
+  </div>
+
+  <!-- Lock -->
+  <div class="section">
+    <h2>Lock fbUSDC Shares — Earn RWT + Fee Discount</h2>
+    <div class="tier-btns">
+      <div class="tier-btn" id="tier-bronze" onclick="selectTier('bronze')">
+        <div class="tier-name">🥉 Bronze</div>
+        <div class="tier-info">30 days · 1× RWT · 20% fee discount</div>
+      </div>
+      <div class="tier-btn" id="tier-silver" onclick="selectTier('silver')">
+        <div class="tier-name">🥈 Silver</div>
+        <div class="tier-info">90 days · 1.3× RWT · 40% fee discount</div>
+      </div>
+      <div class="tier-btn" id="tier-gold" onclick="selectTier('gold')">
+        <div class="tier-name">🥇 Gold</div>
+        <div class="tier-info">180 days · 1.8× RWT · 60% fee discount</div>
+      </div>
+    </div>
+    <div class="input-row">
+      <input id="lock-amount" type="number" placeholder="fbUSDC shares to lock" min="0" step="0.000001" oninput="onLockInput()" />
+      <button class="max-btn" onclick="setLockMax()">Max</button>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px" id="lock-capacity">Active locks: — / 5</div>
+    <div class="preview-block" id="lock-preview">
+      <div class="info-row"><span class="info-label">Estimated RWT (upfront)</span><span class="info-value" id="prev-rwt">—</span></div>
+      <div class="info-row"><span class="info-label">Management fee discount</span><span class="info-value" id="prev-discount">—</span></div>
+      <div class="info-row"><span class="info-label">Unlock date</span><span class="info-value" id="prev-unlock">—</span></div>
+      <div style="font-size:11px;color:var(--yellow);margin-top:8px">⚠ Locked shares cannot be redeemed until unlock date. Early exit requires returning all issued RWT.</div>
+    </div>
+    <div class="action-warn" id="lock-warn"></div>
+    <button class="btn-full" id="lock-btn" onclick="doLock()" disabled>Select Tier &amp; Amount to Lock</button>
+    <div class="status" id="lock-status"></div>
+  </div>
+
+  <!-- My Positions -->
+  <div class="section">
+    <h2>My Lock Positions</h2>
+    <div id="positions-disconnected" style="color:var(--muted);font-size:13px">Connect wallet to view lock positions.</div>
+    <div id="positions-connected" style="display:none">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px" id="positions-count"></div>
+      <div id="positions-list"></div>
+      <button onclick="loadLockPositions(userAddress)" style="margin-top:8px;padding:5px 14px;font-size:12px;border-radius:6px;background:#21262d;color:var(--text);border:1px solid var(--border);cursor:pointer">↻ Refresh Positions</button>
+    </div>
+  </div>
+
+  <!-- Beneficiary -->
+  <div class="section">
+    <h2>Beneficiary / Inheritance</h2>
+    <div id="beneficiary-disconnected" style="color:var(--muted);font-size:13px">Connect wallet to manage beneficiary settings.</div>
+    <div id="beneficiary-connected" style="display:none">
+      <div style="margin-bottom:14px">
+        <div class="info-row"><span class="info-label">Current beneficiary</span><span class="info-value" id="ben-current">—</span></div>
+        <div class="info-row"><span class="info-label">Activity status</span><span class="info-value" id="ben-inactive">—</span></div>
+      </div>
+      <div class="input-row" style="margin-bottom:10px">
+        <input id="ben-input" type="text" placeholder="0x… beneficiary address" />
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn-sm blue" onclick="doSetBeneficiary()">Set / Update Beneficiary</button>
+        <button class="btn-sm red" id="ben-revoke-btn" onclick="doRevokeBeneficiary()" disabled>Revoke</button>
+        <button class="btn-sm green" onclick="doHeartbeat()">Heartbeat</button>
+      </div>
+      <div class="status" id="ben-status"></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:10px;border-top:1px solid var(--border);padding-top:10px">On-chain inheritance logic only — not a legal trust arrangement. Heartbeat records your last active timestamp on-chain.</div>
+    </div>
+  </div>
+
+  <!-- Contract Addresses -->
+  <div class="section">
+    <h2>Contract Addresses — Base Mainnet · Chain ID 8453</h2>
+    <table><thead><tr><th>Contract</th><th>Address</th></tr></thead><tbody id="addr-table"></tbody></table>
+  </div>
+
+  <!-- Risk Disclaimer -->
+  <div class="risk-disclaimer">
+    <h3>Risk Notice — Step 4 · Invited User Access</h3>
+    <ul>
+      <li>Early-stage, invite-only access period — not a public product.</li>
+      <li>Deposits require prior allowlist approval from the fund admin.</li>
+      <li>Yield is generated via Aave V3 on Base — variable rate, not guaranteed.</li>
+      <li>Smart contracts have been tested but not formally audited by a third party.</li>
+      <li>All transactions are submitted from your own wallet. You are responsible for confirming them.</li>
+      <li>Lock positions restrict redemption until the unlock date. Early exit requires returning issued RWT.</li>
+      <li>The protocol may be paused or enter Emergency Exit mode at any time.</li>
+    </ul>
+  </div>
+
+  <div class="version-footer">
+    <div>YearRing-FundProtocol · <strong>v02</strong> · Base Mainnet · Chain ID 8453</div>
+    <div style="margin-top:4px">FundVaultV01 · LockLedgerV02 · LockRewardManagerV02 · BeneficiaryModuleV02 · MetricsLayerV02</div>
+  </div>
+
+</div>
+
+<script>
+const BASE_CHAIN_ID = 8453n
+const ADDR = {
+  USDC:                 '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  FundVaultV01:         '0x8acaec738F9559F8b025c4372d827D3CD3928322',
+  RewardToken:          '0xeAb54e7cFbE5d35ea5203854B44C8516201534A9',
+  LockLedgerV02:        '0x2D95517Cc375ab2dc6433fd44A8706462A418a89',
+  LockBenefitV02:       '0x083C50F9996b8E1389eB4506e24A2A22Df2C6e1c',
+  LockRewardManagerV02: '0xb29DeFCF75f71bc4DaFaA353cE294C284F5e07cB',
+  BeneficiaryModuleV02: '0x0dA3955C58D3252012A76D5CC01E9cc4dfF05C00',
+  UserStateEngineV02:   '0x083A92c65A7f586Bc7B8D3D24EE831C217298e18',
+  MetricsLayerV02:      '0x1C4Ba691688db06a63AfCde29FF377394BF530F1',
+  GovernanceSignalV02:  '0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0',
+  ClaimLedger:          '0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234',
+}
+const USDC_ABI = ['function approve(address,uint256) nonpayable returns (bool)','function balanceOf(address) view returns (uint256)','function allowance(address,address) view returns (uint256)']
+const VAULT_ABI = ['function deposit(uint256,address) nonpayable returns (uint256)','function redeem(uint256,address,address) nonpayable returns (uint256)','function balanceOf(address) view returns (uint256)','function totalAssets() view returns (uint256)','function pricePerShare() view returns (uint256)','function convertToAssets(uint256) view returns (uint256)','function previewDeposit(uint256) view returns (uint256)','function previewRedeem(uint256) view returns (uint256)','function depositsPaused() view returns (bool)','function redeemsPaused() view returns (bool)','function systemMode() view returns (uint8)','function isAllowed(address) view returns (bool)','function approve(address,uint256) nonpayable returns (bool)','function allowance(address,address) view returns (uint256)']
+const RWT_ABI = ['function balanceOf(address) view returns (uint256)','function approve(address,uint256) nonpayable returns (bool)','function allowance(address,address) view returns (uint256)']
+const LEDGER_ABI = ['function getLock(uint256) view returns (tuple(address owner,uint256 shares,uint64 lockedAt,uint64 unlockAt,bool unlocked,bool earlyExited))','function userLockIds(address) view returns (uint256[])','function activeLockCount(address) view returns (uint256)','function unlock(uint256) nonpayable']
+const BENEFIT_ABI = ['function tierOf(uint256) view returns (uint8)','function feeDiscountBpsOf(uint256) view returns (uint256)']
+const LOCK_MGR_ABI = ['function lockWithReward(uint256,uint64) nonpayable returns (uint256)','function claimRebate(uint256) nonpayable returns (uint256)','function earlyExitWithReturn(uint256) nonpayable','function previewRebate(uint256) view returns (uint256)','function issuedRewardTokens(uint256) view returns (uint256)','function checkEarlyExit(uint256) view returns (uint256,uint256,uint256,uint256,uint256,uint256)']
+const BEN_ABI = ['function beneficiaryOf(address) view returns (address)','function setBeneficiary(address) nonpayable','function updateBeneficiary(address) nonpayable','function revokeBeneficiary() nonpayable','function heartbeat() nonpayable','function isInactive(address) view returns (bool)']
+const METRICS_ABI = ['function snapshot() view returns (tuple(uint256 totalTVL,uint256 totalLockedShares,uint256 lockedRatioBps,uint256 totalLocksEver))']
+
+let provider, signer, userAddress
+let vault, usdc, rwt, ledger, benefit, lockMgr, ben, metrics
+let selectedTier = null
+let freeShares = 0n, usdcBal = 0n
+
+const TIER_DURATIONS   = { bronze: 2592000n, silver: 7776000n, gold: 15552000n }
+const TIER_MULTIPLIERS = { bronze: 10000n,   silver: 13000n,  gold: 18000n }
+const TIER_DISCOUNTS   = { bronze: '20%',     silver: '40%',   gold: '60%' }
+const MODE_LABELS      = ['Normal', 'Paused', 'EmergencyExit']
+const TIER_NAMES       = ['None', 'Bronze', 'Silver', 'Gold']
+const TIER_BADGE_CLS   = ['badge-settled', 'badge-bronze', 'badge-silver', 'badge-gold']
+
+const fmt6   = n => n !== undefined ? (Number(n) / 1e6).toFixed(2) : '—'
+const fmt18  = n => n !== undefined ? (Number(n) / 1e18).toFixed(4) : '—'
+const fmtPps = n => n !== undefined ? (Number(n) / 1e6).toFixed(6) : '—'
+const fmtBps = n => n !== undefined ? (Number(n) / 100).toFixed(0) + '%' : '—'
+const fmtTs  = ts => (ts && ts !== 0n) ? new Date(Number(ts) * 1000).toLocaleDateString() : '—'
+const shortAddr = a => (!a || a === ethers.ZeroAddress) ? '—' : a.slice(0,6)+'…'+a.slice(-4)
+const shortHash = h => h.slice(0,10)+'…'
+const bsTx   = h => `<a href="https://basescan.org/tx/${h}" target="_blank">View on Basescan ↗</a>`
+const bsAddr = a => `<a href="https://basescan.org/address/${a}" target="_blank">${a}</a>`
+
+function setStatus(id, msg, cls) { const el = document.getElementById(id); if (el) { el.innerHTML = msg; el.className = 'status ' + (cls||'') } }
+function shortError(e) { return e?.reason || e?.shortMessage || (e?.message||'').slice(0,150) || String(e) }
+function pill(text, cls) { return `<span class="pill ${cls}"><span class="dot"></span>${text}</span>` }
+
+async function connectWallet() {
+  if (!window.ethereum) { alert('No wallet detected. Please install MetaMask.'); return }
+  provider = new ethers.BrowserProvider(window.ethereum)
+  const accounts = await provider.send('eth_requestAccounts', [])
+  if (!accounts.length) return
+  const net = await provider.getNetwork()
+  if (net.chainId !== BASE_CHAIN_ID) { document.getElementById('net-alert').style.display = 'block'; return }
+  signer = await provider.getSigner()
+  userAddress = accounts[0]
+  vault   = new ethers.Contract(ADDR.FundVaultV01,         VAULT_ABI,    signer)
+  usdc    = new ethers.Contract(ADDR.USDC,                 USDC_ABI,     signer)
+  rwt     = new ethers.Contract(ADDR.RewardToken,          RWT_ABI,      signer)
+  ledger  = new ethers.Contract(ADDR.LockLedgerV02,        LEDGER_ABI,   signer)
+  benefit = new ethers.Contract(ADDR.LockBenefitV02,       BENEFIT_ABI,  signer)
+  lockMgr = new ethers.Contract(ADDR.LockRewardManagerV02, LOCK_MGR_ABI, signer)
+  ben     = new ethers.Contract(ADDR.BeneficiaryModuleV02, BEN_ABI,      signer)
+  document.getElementById('connect-btn').style.display = 'none'
+  document.getElementById('wallet-display').style.display = 'flex'
+  document.getElementById('wallet-addr-text').textContent = shortAddr(userAddress)
+  document.getElementById('net-alert').style.display = 'none'
+  ;['position','positions','beneficiary'].forEach(k => {
+    document.getElementById(k+'-disconnected').style.display = 'none'
+    document.getElementById(k+'-connected').style.display = 'block'
+  })
+  await loadProtocolData()
+  await loadUserData(userAddress)
+}
+
+async function switchNetwork() {
+  await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x2105' }] })
+    .catch(() => window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId:'0x2105', chainName:'Base', rpcUrls:['https://mainnet.base.org'], nativeCurrency:{name:'ETH',symbol:'ETH',decimals:18}, blockExplorerUrls:['https://basescan.org'] }] }))
+  location.reload()
+}
+
+function disconnectWallet() {
+  userAddress = null; signer = null
+  document.getElementById('connect-btn').style.display = 'block'
+  document.getElementById('wallet-display').style.display = 'none'
+  ;['position','positions','beneficiary'].forEach(k => {
+    document.getElementById(k+'-disconnected').style.display = 'block'
+    document.getElementById(k+'-connected').style.display = 'none'
+  })
+  document.getElementById('deposit-btn').disabled = true
+  document.getElementById('redeem-btn').disabled = true
+  document.getElementById('lock-btn').disabled = true
+}
+
+async function loadProtocolData() {
+  try {
+    const ro = vault || new ethers.Contract(ADDR.FundVaultV01, VAULT_ABI, new ethers.JsonRpcProvider('https://mainnet.base.org'))
+    const roM = new ethers.Contract(ADDR.MetricsLayerV02, METRICS_ABI, ro.runner)
+    const [tvl, pps, dep, red, mode, snap] = await Promise.all([ro.totalAssets(), ro.pricePerShare(), ro.depositsPaused(), ro.redeemsPaused(), ro.systemMode(), roM.snapshot()])
+    document.getElementById('stat-tvl').textContent      = fmt6(tvl) + ' USDC'
+    document.getElementById('stat-pps').textContent      = fmtPps(pps)
+    document.getElementById('stat-lockrate').textContent = fmtBps(snap.lockedRatioBps)
+    document.getElementById('stat-locks').textContent    = snap.totalLocksEver.toString()
+    const m = Number(mode)
+    document.getElementById('status-pills').innerHTML = [
+      pill('Mode: ' + (MODE_LABELS[m]||m), m===0?'ok':m===1?'warn':'err'),
+      pill('Deposits: '+(dep?'Paused':'Open'), dep?'err':'ok'),
+      pill('Redeems: '+(red?'Paused':'Open'), red?'err':'ok'),
+    ].join('')
+  } catch(e) { console.warn('loadProtocolData', e) }
+}
+
+async function loadUserData(addr) {
+  if (!addr || !vault) return
+  try {
+    const [usdcB, sharesTotal, rwtB, lockCount, allowed, dep, red, mode] = await Promise.all([
+      usdc.balanceOf(addr), vault.balanceOf(addr), rwt.balanceOf(addr),
+      ledger.activeLockCount(addr), vault.isAllowed(addr),
+      vault.depositsPaused(), vault.redeemsPaused(), vault.systemMode(),
+    ])
+    const lockIds = await ledger.userLockIds(addr)
+    let lockedShares = 0n
+    for (const id of lockIds) { const lk = await ledger.getLock(id); if (!lk.unlocked && !lk.earlyExited) lockedShares += lk.shares }
+    freeShares = sharesTotal - lockedShares; usdcBal = usdcB
+    document.getElementById('pos-usdc').textContent         = fmt6(usdcB) + ' USDC'
+    document.getElementById('pos-shares-total').textContent = fmt18(sharesTotal) + ' fbUSDC'
+    document.getElementById('pos-shares-split').textContent = fmt18(freeShares) + ' free / ' + fmt18(lockedShares) + ' locked'
+    document.getElementById('pos-rwt').textContent          = fmt18(rwtB) + ' RWT'
+    document.getElementById('pos-lockcount').textContent    = lockCount.toString() + ' / 5'
+    document.getElementById('lock-capacity').textContent    = 'Active locks: ' + lockCount.toString() + ' / 5'
+    const m = Number(mode)
+    document.getElementById('pos-pills').innerHTML = [
+      pill(allowed ? 'Allowlisted ✓' : 'Not Allowlisted', allowed ? 'ok' : 'err'),
+      ...(m!==0 ? [pill('Mode: '+MODE_LABELS[m], 'err')] : []),
+      ...(dep ? [pill('Deposits Paused', 'err')] : []),
+      ...(red ? [pill('Redeems Paused', 'err')] : []),
+    ].join ? [pill(allowed?'Allowlisted ✓':'Not Allowlisted', allowed?'ok':'err'),
+               ...(m!==0?[pill('Mode: '+MODE_LABELS[m],'err')]:[]),
+               ...(dep?[pill('Deposits Paused','err')]:[]),
+               ...(red?[pill('Redeems Paused','err')]:[])].join('') : ''
+    document.getElementById('pos-pills').innerHTML = [
+      pill(allowed?'Allowlisted ✓':'Not Allowlisted', allowed?'ok':'err'),
+      ...(m!==0?[pill('Mode: '+MODE_LABELS[m],'err')]:[]),
+      ...(dep?[pill('Deposits Paused','err')]:[]),
+      ...(red?[pill('Redeems Paused','err')]:[]),
+    ].join('')
+    const dw = document.getElementById('deposit-warn')
+    dw.textContent = !allowed ? 'Your address is not on the deposit allowlist.' : dep ? 'Deposits are currently paused.' : m!==0 ? 'System is in '+MODE_LABELS[m]+' mode.' : ''
+    document.getElementById('redeem-warn').textContent = red ? 'Redeems are currently paused.' : m===2 ? 'EmergencyExit mode — normal redeem is disabled.' : ''
+    document.getElementById('deposit-btn').disabled = !allowed || dep || m!==0
+    document.getElementById('redeem-btn').disabled  = red || m===2
+    updateLockBtn()
+    await loadBeneficiary(addr)
+    await loadLockPositions(addr)
+    await loadProtocolData()
+  } catch(e) { console.error('loadUserData', e) }
+}
+
+async function onDepositInput() {
+  const amt = parseFloat(document.getElementById('deposit-amount').value)
+  if (!amt || !vault) { document.getElementById('deposit-preview').textContent = '≈ — fbUSDC'; return }
+  try { const p = await vault.previewDeposit(ethers.parseUnits(String(amt),6)); document.getElementById('deposit-preview').textContent = '≈ '+fmt18(p)+' fbUSDC' }
+  catch { document.getElementById('deposit-preview').textContent = '≈ — fbUSDC' }
+}
+function setDepositMax() { if (usdcBal>0n) document.getElementById('deposit-amount').value=fmt6(usdcBal); onDepositInput() }
+async function doDeposit() {
+  if (!userAddress) return
+  const s = document.getElementById('deposit-amount').value; if (!s||parseFloat(s)<=0) return
+  const amount = ethers.parseUnits(s, 6); const btn = document.getElementById('deposit-btn'); btn.disabled=true
+  try {
+    const al = await usdc.allowance(userAddress, ADDR.FundVaultV01)
+    if (al < amount) { setStatus('deposit-status','Approving USDC…','info'); btn.textContent='Approving…'; await (await usdc.approve(ADDR.FundVaultV01, amount)).wait() }
+    setStatus('deposit-status','Depositing…','info'); btn.textContent='Depositing…'
+    const tx = await vault.deposit(amount, userAddress); setStatus('deposit-status','Submitted — waiting…','info'); await tx.wait()
+    setStatus('deposit-status','✓ Done — '+bsTx(tx.hash),'ok')
+    document.getElementById('deposit-amount').value=''; document.getElementById('deposit-preview').textContent='≈ — fbUSDC'
+    await loadUserData(userAddress)
+  } catch(e) { setStatus('deposit-status',shortError(e),'err') }
+  finally { btn.textContent='Approve & Deposit'; btn.disabled=false }
+}
+
+async function onRedeemInput() {
+  const amt = parseFloat(document.getElementById('redeem-shares').value)
+  if (!amt || !vault) { document.getElementById('redeem-preview').textContent='≈ — USDC'; return }
+  try { const p = await vault.previewRedeem(ethers.parseUnits(String(amt),18)); document.getElementById('redeem-preview').textContent='≈ '+fmt6(p)+' USDC' }
+  catch { document.getElementById('redeem-preview').textContent='≈ — USDC' }
+}
+function setRedeemMax() { if (freeShares>0n) document.getElementById('redeem-shares').value=ethers.formatUnits(freeShares,18); onRedeemInput() }
+function setRedeemPct(p) { if (freeShares>0n) { document.getElementById('redeem-shares').value=ethers.formatUnits(freeShares*BigInt(p)/100n,18); onRedeemInput() } }
+async function doRedeem() {
+  if (!userAddress) return
+  const s = document.getElementById('redeem-shares').value; if (!s||parseFloat(s)<=0) return
+  const shares = ethers.parseUnits(s,18); const btn=document.getElementById('redeem-btn'); btn.disabled=true; btn.textContent='Redeeming…'
+  try {
+    setStatus('redeem-status','Submitting…','info')
+    const tx = await vault.redeem(shares,userAddress,userAddress); await tx.wait()
+    setStatus('redeem-status','✓ Done — '+bsTx(tx.hash),'ok')
+    document.getElementById('redeem-shares').value=''; document.getElementById('redeem-preview').textContent='≈ — USDC'
+    await loadUserData(userAddress)
+  } catch(e) { setStatus('redeem-status',shortError(e),'err') }
+  finally { btn.textContent='Redeem'; btn.disabled=false }
+}
+
+function selectTier(t) {
+  selectedTier=t
+  ;['bronze','silver','gold'].forEach(n => document.getElementById('tier-'+n).classList.toggle('selected',n===t))
+  updateLockBtn(); onLockInput()
+}
+async function onLockInput() {
+  const amt = parseFloat(document.getElementById('lock-amount').value)
+  updateLockBtn()
+  if (!amt||!selectedTier||!vault) { document.getElementById('lock-preview').classList.remove('show'); return }
+  try {
+    const shares = ethers.parseUnits(String(amt),18)
+    const usdcVal = await vault.convertToAssets(shares)
+    const dur = TIER_DURATIONS[selectedTier], mul = TIER_MULTIPLIERS[selectedTier]
+    const rwtPrev = usdcVal * 1_000_000_000_000n * (dur/86400n) * mul / (10000n*50n)
+    document.getElementById('prev-rwt').textContent     = fmt18(rwtPrev)+' RWT'
+    document.getElementById('prev-discount').textContent = TIER_DISCOUNTS[selectedTier]
+    document.getElementById('prev-unlock').textContent  = new Date(Date.now()+Number(dur)*1000).toLocaleDateString()
+    document.getElementById('lock-preview').classList.add('show')
+  } catch { document.getElementById('lock-preview').classList.remove('show') }
+}
+function setLockMax() { if (freeShares>0n) document.getElementById('lock-amount').value=ethers.formatUnits(freeShares,18); onLockInput() }
+function updateLockBtn() {
+  const btn=document.getElementById('lock-btn'), amt=parseFloat(document.getElementById('lock-amount').value)
+  if (!selectedTier) { btn.textContent='Select Tier & Amount to Lock'; btn.disabled=true; return }
+  if (!amt||amt<=0)  { btn.textContent='Enter Amount to Lock'; btn.disabled=true; return }
+  if (!userAddress)  { btn.disabled=true; return }
+  btn.textContent='Approve fbUSDC → Lock'; btn.disabled=false
+}
+async function doLock() {
+  if (!userAddress||!selectedTier) return
+  const s = document.getElementById('lock-amount').value; if (!s||parseFloat(s)<=0) return
+  const shares=ethers.parseUnits(s,18), dur=TIER_DURATIONS[selectedTier]
+  const btn=document.getElementById('lock-btn'); btn.disabled=true
+  try {
+    const al = await vault.allowance(userAddress, ADDR.LockRewardManagerV02)
+    if (al<shares) { setStatus('lock-status','Approving fbUSDC…','info'); btn.textContent='Approving…'; await (await vault.approve(ADDR.LockRewardManagerV02,shares)).wait() }
+    setStatus('lock-status','Locking shares…','info'); btn.textContent='Locking…'
+    const tx = await lockMgr.lockWithReward(shares,dur); await tx.wait()
+    setStatus('lock-status','✓ Locked — '+bsTx(tx.hash),'ok')
+    document.getElementById('lock-amount').value=''; document.getElementById('lock-preview').classList.remove('show')
+    await loadUserData(userAddress)
+  } catch(e) { setStatus('lock-status',shortError(e),'err') }
+  finally { btn.textContent='Approve fbUSDC → Lock'; btn.disabled=false; updateLockBtn() }
+}
+
+async function loadLockPositions(addr) {
+  if (!addr||!ledger) return
+  const list=document.getElementById('positions-list'), cnt=document.getElementById('positions-count')
+  list.innerHTML='<div style="color:var(--muted);font-size:13px">Loading…</div>'
+  try {
+    const ids = await ledger.userLockIds(addr)
+    if (!ids.length) { cnt.textContent='No lock positions.'; list.innerHTML='<div style="color:var(--muted);font-size:13px">No lock positions yet.</div>'; return }
+    cnt.textContent=ids.length+' position(s)'; list.innerHTML=''
+    for (const id of ids) {
+      const [lk,tier,rebate,issued] = await Promise.all([ledger.getLock(id),benefit.tierOf(id),lockMgr.previewRebate(id),lockMgr.issuedRewardTokens(id)])
+      const now=BigInt(Math.floor(Date.now()/1000)), settled=lk.unlocked||lk.earlyExited, matured=!settled&&lk.unlockAt>0n&&now>=lk.unlockAt
+      const tn=Number(tier), tLabel=TIER_NAMES[tn]||'?', tCls=TIER_BADGE_CLS[tn]||'badge-settled'
+      const stateBadge=settled?'<span class="badge badge-settled">Settled</span>':matured?'<span class="badge badge-matured">Matured</span>':'<span class="badge badge-accumulating">Accumulating</span>'
+      const card=document.createElement('div'); card.className='position-card'
+      card.innerHTML=`
+        <div class="position-header">
+          <div class="position-title"><span class="badge ${tCls}">${tLabel}</span>&nbsp;Lock #${id}</div>
+          ${stateBadge}
+        </div>
+        <div class="info-row"><span class="info-label">Shares locked</span><span class="info-value">${fmt18(lk.shares)} fbUSDC</span></div>
+        <div class="info-row"><span class="info-label">Locked on</span><span class="info-value">${fmtTs(lk.lockedAt)}</span></div>
+        <div class="info-row"><span class="info-label">Unlocks on</span><span class="info-value">${fmtTs(lk.unlockAt)}</span></div>
+        <div class="info-row"><span class="info-label">Rebate available</span><span class="info-value">${fmt18(rebate)} fbUSDC</span></div>
+        <div class="info-row"><span class="info-label">RWT issued</span><span class="info-value">${fmt18(issued)} RWT</span></div>
+        ${!settled?`
+        <div class="position-actions">
+          <button class="btn-sm green" onclick="doClaimRebate(${id}n)" ${rebate===0n?'disabled':''}>Claim Rebate</button>
+          <button class="btn-sm blue" onclick="doUnlock(${id}n)" ${!matured?'disabled title="Not yet matured"':''}>Unlock</button>
+          <button class="btn-sm red" onclick="doEarlyExit(${id}n)">Early Exit…</button>
+        </div>
+        <div class="status" id="pos-status-${id}"></div>`:''}`
+      list.appendChild(card)
+    }
+  } catch(e) { list.innerHTML='<div style="color:var(--red);font-size:12px">'+shortError(e)+'</div>' }
+}
+
+async function doClaimRebate(lockId) {
+  const sid='pos-status-'+lockId; setStatus(sid,'Claiming rebate…','info')
+  try { const tx=await lockMgr.claimRebate(lockId); await tx.wait(); setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress) }
+  catch(e) { setStatus(sid,shortError(e),'err') }
+}
+async function doUnlock(lockId) {
+  const sid='pos-status-'+lockId; setStatus(sid,'Unlocking…','info')
+  try { const tx=await ledger.unlock(lockId); await tx.wait(); setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress) }
+  catch(e) { setStatus(sid,shortError(e),'err') }
+}
+async function doEarlyExit(lockId) {
+  const sid='pos-status-'+lockId
+  try {
+    const [,tokensToReturn,,,,userTokenAllowance] = await lockMgr.checkEarlyExit(lockId)
+    if (!confirm(`Early Exit Lock #${lockId}\n\nMust return ${fmt18(tokensToReturn)} RWT to treasury.\n\nProceed?`)) return
+    if (userTokenAllowance<tokensToReturn) { setStatus(sid,'Approving RWT…','info'); await (await rwt.approve(ADDR.LockRewardManagerV02,tokensToReturn)).wait() }
+    setStatus(sid,'Submitting early exit…','info')
+    const tx=await lockMgr.earlyExitWithReturn(lockId); await tx.wait()
+    setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress)
+  } catch(e) { setStatus(sid,shortError(e),'err') }
+}
+
+async function loadBeneficiary(addr) {
+  if (!addr||!ben) return
+  try {
+    const [cur,inactive]=[await ben.beneficiaryOf(addr),await ben.isInactive(addr)]
+    const isSet=cur!==ethers.ZeroAddress
+    document.getElementById('ben-current').innerHTML=isSet?bsAddr(cur):'Not set'
+    document.getElementById('ben-inactive').innerHTML=inactive?'<span class="badge badge-settled">Inactive</span>':'<span class="badge badge-accumulating">Active</span>'
+    document.getElementById('ben-revoke-btn').disabled=!isSet
+    if (isSet) document.getElementById('ben-input').value=cur
+  } catch(e) { console.error(e) }
+}
+async function doSetBeneficiary() {
+  const addr=document.getElementById('ben-input').value.trim()
+  if (!ethers.isAddress(addr)) { setStatus('ben-status','Invalid address.','err'); return }
+  setStatus('ben-status','Submitting…','info')
+  try {
+    const cur=await ben.beneficiaryOf(userAddress)
+    const tx=cur!==ethers.ZeroAddress?await ben.updateBeneficiary(addr):await ben.setBeneficiary(addr)
+    await tx.wait(); setStatus('ben-status','✓ Done — '+bsTx(tx.hash),'ok'); await loadBeneficiary(userAddress)
+  } catch(e) { setStatus('ben-status',shortError(e),'err') }
+}
+async function doRevokeBeneficiary() {
+  if (!confirm('Revoke beneficiary?')) return
+  setStatus('ben-status','Revoking…','info')
+  try { const tx=await ben.revokeBeneficiary(); await tx.wait(); setStatus('ben-status','✓ Revoked — '+bsTx(tx.hash),'ok'); await loadBeneficiary(userAddress) }
+  catch(e) { setStatus('ben-status',shortError(e),'err') }
+}
+async function doHeartbeat() {
+  setStatus('ben-status','Sending heartbeat…','info')
+  try { const tx=await ben.heartbeat(); await tx.wait(); setStatus('ben-status','✓ Heartbeat recorded — '+bsTx(tx.hash),'ok') }
+  catch(e) { setStatus('ben-status',shortError(e),'err') }
+}
+
+function buildAddrTable() {
+  const tb=document.getElementById('addr-table')
+  Object.entries(ADDR).forEach(([name,addr]) => { const tr=document.createElement('tr'); tr.innerHTML=`<td>${name}</td><td><a href="https://basescan.org/address/${addr}" target="_blank">${addr}</a></td>`; tb.appendChild(tr) })
+}
+
+window.addEventListener('load', async () => {
+  buildAddrTable()
+  try {
+    const ro=new ethers.JsonRpcProvider('https://mainnet.base.org')
+    const rv=new ethers.Contract(ADDR.FundVaultV01,VAULT_ABI,ro)
+    const rm=new ethers.Contract(ADDR.MetricsLayerV02,METRICS_ABI,ro)
+    const [tvl,pps,dep,red,mode,snap]=await Promise.all([rv.totalAssets(),rv.pricePerShare(),rv.depositsPaused(),rv.redeemsPaused(),rv.systemMode(),rm.snapshot()])
+    document.getElementById('stat-tvl').textContent=fmt6(tvl)+' USDC'
+    document.getElementById('stat-pps').textContent=fmtPps(pps)
+    document.getElementById('stat-lockrate').textContent=fmtBps(snap.lockedRatioBps)
+    document.getElementById('stat-locks').textContent=snap.totalLocksEver.toString()
+    const m=Number(mode)
+    document.getElementById('status-pills').innerHTML=[pill('Mode: '+(MODE_LABELS[m]||m),m===0?'ok':m===1?'warn':'err'),pill('Deposits: '+(dep?'Paused':'Open'),dep?'err':'ok'),pill('Redeems: '+(red?'Paused':'Open'),red?'err':'ok')].join('')
+  } catch(e) { console.warn('public rpc',e) }
+  if (window.ethereum) {
+    window.ethereum.on('accountsChanged',a=>{ if(!a.length) disconnectWallet() })
+    window.ethereum.on('chainChanged',()=>location.reload())
+    const a=await window.ethereum.request({method:'eth_accounts'}).catch(()=>[])
+    if (a.length) connectWallet()
+  }
+})
+</script>
+</body>
+</html>
