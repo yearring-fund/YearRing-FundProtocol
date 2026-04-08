@@ -43,6 +43,7 @@ async function main() {
   MetricsLayerV02:      '${c.MetricsLayerV02}',
   GovernanceSignalV02:  '${c.GovernanceSignalV02 || ""}',
   ClaimLedger:          '${c.ClaimLedger || ""}',
+  StrategyManagerV01:   '${c.StrategyManagerV01 || ""}',
 }`;
 
   const addrRegex = /const ADDR = \{[\s\S]*?\}/;

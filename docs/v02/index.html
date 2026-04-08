@@ -442,6 +442,8 @@ const ADDR = {
   MetricsLayerV02:      '0x4937abE8e01dE6a081CF03b59151733E0Fde63E2',
   GovernanceSignalV02:  '0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0',
   ClaimLedger:          '0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234',
+  StrategyManagerV01:   '0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54',
+  LockRewardManagerV02_old: '0xA939f6eB5d5663c436A9eBA89DeCD5cA9098355b',
 }
 const ROLE_ADMIN    = '0x087ea7F67d9282f0bdC43627b855F79789C6824C'
 const ROLE_GUARDIAN = '0xC8052cF447d429f63E890385a6924464B85c5834'
@@ -457,7 +459,7 @@ const BEN_ABI = ['function beneficiaryOf(address user) view returns (address)','
 const METRICS_ABI = ['function snapshot() view returns (tuple(uint256 totalTVL,uint256 totalLockedShares,uint256 lockedRatioBps,uint256 totalLocksEver))']
 
 let provider, signer, userAddress
-let vault, usdc, rwt, ledger, benefit, lockMgr, ben, metrics, stratMgr
+let vault, usdc, rwt, ledger, benefit, lockMgr, lockMgrOld, ben, metrics, stratMgr
 let selectedTier = null
 let freeShares = 0n, usdcBal = 0n, treasuryShares = 0n
 
@@ -498,7 +500,8 @@ async function connectWallet() {
   benefit = new ethers.Contract(ADDR.LockBenefitV02,       BENEFIT_ABI,  signer)
   lockMgr = new ethers.Contract(ADDR.LockRewardManagerV02, LOCK_MGR_ABI, signer)
   ben     = new ethers.Contract(ADDR.BeneficiaryModuleV02, BEN_ABI,      signer)
-  stratMgr = new ethers.Contract(ADDR.StrategyManagerV01, STRAT_MGR_ABI, signer)
+  stratMgr   = new ethers.Contract(ADDR.StrategyManagerV01,          STRAT_MGR_ABI, signer)
+  lockMgrOld = new ethers.Contract(ADDR.LockRewardManagerV02_old,    LOCK_MGR_ABI,  signer)
   document.getElementById('connect-btn').style.display = 'none'
   document.getElementById('wallet-display').style.display = 'flex'
   document.getElementById('wallet-addr-text').textContent = shortAddr(userAddress)
@@ -750,10 +753,19 @@ async function loadLockPositions(addr) {
     if (!ids.length) { cnt.textContent='No lock positions.'; list.innerHTML='<div style="color:var(--muted);font-size:13px">No lock positions yet.</div>'; return }
     cnt.textContent=ids.length+' position(s)'; list.innerHTML=''
     for (const id of ids) {
-      const [lk,tier,rebate,issued] = await Promise.all([ledger.getLock(id),benefit.tierOf(id),lockMgr.previewRebate(id),lockMgr.issuedRewardTokens(id)])
+      const [lk,tier] = await Promise.all([ledger.getLock(id), benefit.tierOf(id)])
+      // Determine which LockRewardManager owns this lock (new or old)
+      let activeLockMgr = lockMgr, isLegacy = false
+      let issued = await lockMgr.issuedRewardTokens(id)
+      if (issued === 0n && lockMgrOld) {
+        const issuedOld = await lockMgrOld.issuedRewardTokens(id)
+        if (issuedOld > 0n) { issued = issuedOld; activeLockMgr = lockMgrOld; isLegacy = true }
+      }
+      const rebate = await activeLockMgr.previewRebate(id)
       const now=BigInt(Math.floor(Date.now()/1000)), settled=lk.unlocked||lk.earlyExited, matured=!settled&&lk.unlockAt>0n&&now>=lk.unlockAt
       const tn=Number(tier), tLabel=TIER_NAMES[tn]||'?', tCls=TIER_BADGE_CLS[tn]||'badge-settled'
       const stateBadge=settled?'<span class="badge badge-settled">Settled</span>':matured?'<span class="badge badge-matured">Matured</span>':'<span class="badge badge-accumulating">Accumulating</span>'
+      const legacyNote=isLegacy?'<div style="font-size:11px;color:var(--yellow);margin-top:6px">⚠ Legacy lock — created via previous contract version. Unlock at maturity works normally.</div>':''
       const card=document.createElement('div'); card.className='position-card'
       card.innerHTML=`
         <div class="position-header">
@@ -765,11 +777,12 @@ async function loadLockPositions(addr) {
         <div class="info-row"><span class="info-label">Unlocks on</span><span class="info-value">${fmtTs(lk.unlockAt)}</span></div>
         <div class="info-row"><span class="info-label">Rebate available</span><span class="info-value">${fmt18(rebate)} fbUSDC</span></div>
         <div class="info-row"><span class="info-label">RWT issued</span><span class="info-value">${fmt18(issued)} RWT</span></div>
+        ${legacyNote}
         ${!settled?`
         <div class="position-actions">
-          <button class="btn-sm green" onclick="doClaimRebate(${id}n)" ${rebate===0n?'disabled':''}>Claim Rebate</button>
+          <button class="btn-sm green" onclick="doClaimRebate(${id}n,${isLegacy})" ${rebate===0n?'disabled':''}>Claim Rebate</button>
           <button class="btn-sm blue" onclick="doUnlock(${id}n)" ${!matured?'disabled title="Not yet matured"':''}>Unlock</button>
-          <button class="btn-sm red" onclick="doEarlyExit(${id}n)">Early Exit…</button>
+          <button class="btn-sm red" onclick="doEarlyExit(${id}n,${isLegacy})">Early Exit…</button>
         </div>
         <div class="status" id="pos-status-${id}"></div>`:''}`
       list.appendChild(card)
@@ -777,9 +790,9 @@ async function loadLockPositions(addr) {
   } catch(e) { list.innerHTML='<div style="color:var(--red);font-size:12px">'+shortError(e)+'</div>' }
 }
 
-async function doClaimRebate(lockId) {
+async function doClaimRebate(lockId, legacy=false) {
   const sid='pos-status-'+lockId; setStatus(sid,'Claiming rebate…','info')
-  try { const tx=await lockMgr.claimRebate(lockId); await tx.wait(); setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress) }
+  try { const mgr=legacy?lockMgrOld:lockMgr; const tx=await mgr.claimRebate(lockId); await tx.wait(); setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress) }
   catch(e) { setStatus(sid,shortError(e),'err') }
 }
 async function doUnlock(lockId) {
@@ -787,14 +800,16 @@ async function doUnlock(lockId) {
   try { const tx=await ledger.unlock(lockId); await tx.wait(); setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress) }
   catch(e) { setStatus(sid,shortError(e),'err') }
 }
-async function doEarlyExit(lockId) {
+async function doEarlyExit(lockId, legacy=false) {
   const sid='pos-status-'+lockId
   try {
-    const [,tokensToReturn,,,,userTokenAllowance] = await lockMgr.checkEarlyExit(lockId)
+    const mgr=legacy?lockMgrOld:lockMgr
+    const mgrAddr=legacy?ADDR.LockRewardManagerV02_old:ADDR.LockRewardManagerV02
+    const [,tokensToReturn,,,,userTokenAllowance] = await mgr.checkEarlyExit(lockId)
     if (!confirm(`Early Exit Lock #${lockId}\n\nMust return ${fmt18(tokensToReturn)} RWT to treasury.\n\nProceed?`)) return
-    if (userTokenAllowance<tokensToReturn) { setStatus(sid,'Approving RWT…','info'); await (await rwt.approve(ADDR.LockRewardManagerV02,tokensToReturn)).wait() }
+    if (userTokenAllowance<tokensToReturn) { setStatus(sid,'Approving RWT…','info'); await (await rwt.approve(mgrAddr,tokensToReturn)).wait() }
     setStatus(sid,'Submitting early exit…','info')
-    const tx=await lockMgr.earlyExitWithReturn(lockId); await tx.wait()
+    const tx=await mgr.earlyExitWithReturn(lockId); await tx.wait()
     setStatus(sid,'✓ Done — '+bsTx(tx.hash),'ok'); await loadLockPositions(userAddress); await loadUserData(userAddress)
   } catch(e) { setStatus(sid,shortError(e),'err') }
 }
