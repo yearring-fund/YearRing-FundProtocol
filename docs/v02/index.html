@@ -623,9 +623,16 @@ async function doDeposit() {
   const amount = ethers.parseUnits(s, 6); const btn = document.getElementById('deposit-btn'); btn.disabled=true
   try {
     const al = await usdc.allowance(userAddress, ADDR.FundVaultV01)
-    if (al < amount) { setStatus('deposit-status','Approving USDC…','info'); btn.textContent='Approving…'; await (await usdc.approve(ADDR.FundVaultV01, amount)).wait() }
+    if (al < amount) {
+      btn.textContent='Approving…'
+      const approveTx = await usdc.approve(ADDR.FundVaultV01, amount)
+      setStatus('deposit-status','Approving USDC — '+bsTx(approveTx.hash),'info')
+      await approveTx.wait()
+    }
     setStatus('deposit-status','Depositing…','info'); btn.textContent='Depositing…'
-    const tx = await vault.deposit(amount, userAddress); setStatus('deposit-status','Submitted — waiting…','info'); await tx.wait()
+    const tx = await vault.deposit(amount, userAddress)
+    setStatus('deposit-status','Submitted — '+bsTx(tx.hash),'info')
+    await tx.wait()
     setStatus('deposit-status','✓ Done — '+bsTx(tx.hash),'ok')
     document.getElementById('deposit-amount').value=''; document.getElementById('deposit-preview').textContent='≈ — fbUSDC'
     await loadUserData(userAddress)
