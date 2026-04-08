@@ -535,9 +535,19 @@ async function doLock() {
     const al = await vault.allowance(userAddress, ADDR.LockRewardManagerV02)
     if (al<shares) {
       setStatus('lock-status','Approving fbUSDC…','info'); btn.textContent='Approving…'
-      await (await vault.approve(ADDR.LockRewardManagerV02, shares)).wait()
-      const alAfter = await vault.allowance(userAddress, ADDR.LockRewardManagerV02)
-      if (alAfter < shares) { setStatus('lock-status','Approval did not take effect — please try again.','err'); return }
+      await vault.approve(ADDR.LockRewardManagerV02, shares)
+      // Poll allowance until confirmed (handles MetaMask Smart Account / Delegation Manager)
+      const deadline = Date.now() + 60000
+      let alAfter = 0n
+      while (Date.now() < deadline) {
+        alAfter = await vault.allowance(userAddress, ADDR.LockRewardManagerV02)
+        if (alAfter >= shares) break
+        await new Promise(r => setTimeout(r, 2000))
+      }
+      if (alAfter < shares) {
+        setStatus('lock-status','Approval not detected on-chain. If using MetaMask Smart Account, please switch to a regular EOA account and retry.','err')
+        return
+      }
     }
     setStatus('lock-status','Locking shares…','info'); btn.textContent='Locking…'
     const tx = await lockMgr.lockWithReward(shares,dur); await tx.wait()
