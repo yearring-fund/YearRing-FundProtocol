@@ -1,0 +1,53 @@
+SPDX-License-Identifier: BUSL-1.1
+
+Licensor:       YearRing Fund Protocol
+Licensed Work:  yearring-protocol
+                Copyright (c) 2024 YearRing Fund Protocol
+
+Change Date:    Two (2) years from the date each version of the Licensed Work
+                is first committed to the main branch of this repository.
+                V01 initial release: 2024-01-01 → Change Date: 2026-01-01
+                V02 initial release: 2025-01-01 → Change Date: 2027-01-01
+
+Change License: MIT
+
+Additional Use Grant:
+
+  The following uses are permitted free of charge regardless of whether
+  they would otherwise constitute a Competing Use:
+
+  (a) Research, academic study, security review, and audit of this code;
+  (b) Deployment on any public testnet or private development network;
+  (c) Internal evaluation and proof-of-concept where the software is
+      not made available to third parties;
+  (d) Integration of published interfaces (ABIs, events, return types)
+      but not the core accounting or fee logic, into non-competing products;
+  (e) Any use by a party that has received express written authorization
+      from YearRing Fund Protocol, limited to the scope of that authorization.
+
+  Production use outside the above is permitted only for:
+  (i)  Smart contract addresses officially deployed by YearRing Fund Protocol
+       and listed at:
+       https://github.com/yearring-fund/YearRing-FundProtocol/blob/main/deployments/
+  (ii) Parties holding a separate written license agreement with
+       YearRing Fund Protocol.
+
+Competing Use Definition:
+
+  "Competing Use" means operating or making available to third parties,
+  in a live production environment, any product or service that:
+
+  (a) accepts deposits, subscriptions, or capital contributions from
+      third parties and issues shares, units, or receipt tokens representing
+      beneficial interest in a managed pool of assets;
+  (b) processes redemptions or withdrawals of such instruments; and
+  (c) charges management fees, performance fees, or other compensation
+      for managing such pooled assets —
+
+  where "third parties" means persons or entities other than YearRing Fund
+  Protocol and its affiliates.
+
+  The definition is intentionally business-scoped, not technical.
+  Wrapping this code in a different interface does not change the analysis.
+
+Full license text: https://mariadb.com/bsl11/
