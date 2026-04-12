@@ -29,6 +29,17 @@ interface ILockRewardManagerV02 {
         uint256 rewardTokensReturned
     );
 
+    /// @notice Guardian approved a forced exit for a specific lock
+    event ForceExitApproved(uint256 indexed lockId, address indexed approver);
+
+    /// @notice Admin executed a forced exit (bypassing rebate and RWT return)
+    event ForceExitExecuted(
+        uint256 indexed lockId,
+        address indexed owner,
+        address indexed executor,
+        string  reason
+    );
+
     // -------------------------------------------------------------------------
     // User operations
     // -------------------------------------------------------------------------
@@ -62,6 +73,21 @@ interface ILockRewardManagerV02 {
 
     /// @notice Timestamp of last rebate settlement for a position
     function lastRebateClaimedAt(uint256 lockId) external view returns (uint256);
+
+    /// @notice Guardian pre-approves a forced exit for a lock
+    /// @dev Requires EMERGENCY_ROLE. Must be followed by executeForceExit from admin.
+    function approveForceExit(uint256 lockId) external;
+
+    /// @notice Admin executes a forced early exit — bypasses rebate settlement and RWT return
+    /// @dev Requires DEFAULT_ADMIN_ROLE + prior guardian approval via approveForceExit.
+    ///      Use only when earlyExitWithReturn is blocked (e.g. treasury balance issue or bug).
+    ///      Owner receives their shares. Unclaimed rebate and unretured RWT are forfeited.
+    /// @param lockId  Lock position ID
+    /// @param reason  Human-readable justification (recorded on-chain for auditability)
+    function executeForceExit(uint256 lockId, string calldata reason) external;
+
+    /// @notice Returns whether a forced exit has been approved by guardian for lockId
+    function forceExitApproved(uint256 lockId) external view returns (bool);
 
     /// @notice Preview pending rebate shares for a lock position
     function previewRebate(uint256 lockId) external view returns (uint256 rebateShares);

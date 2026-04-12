@@ -73,6 +73,10 @@ contract LockRewardManagerV02 is ILockRewardManagerV02, AccessControl, Pausable,
     /// @notice Timestamp of last rebate settlement per lockId (initialized to lockedAt)
     mapping(uint256 => uint256) public override lastRebateClaimedAt;
 
+    /// @notice Guardian pre-approval for forced exit (lockId → approved)
+    /// @dev Set by EMERGENCY_ROLE; consumed (cleared) on executeForceExit.
+    mapping(uint256 => bool) public override forceExitApproved;
+
     // -------------------------------------------------------------------------
     // Errors
     // -------------------------------------------------------------------------
@@ -83,6 +87,8 @@ contract LockRewardManagerV02 is ILockRewardManagerV02, AccessControl, Pausable,
     error LockAlreadyMature(uint256 lockId);
     error InsufficientRewardTokenAllowance(uint256 required, uint256 allowed);
     error InsufficientVaultSharesAllowance(uint256 required, uint256 allowed);
+    error ForceExitNotApproved(uint256 lockId);
+    error LockNotFound(uint256 lockId);
 
     // -------------------------------------------------------------------------
     // Constructor
@@ -295,6 +301,43 @@ contract LockRewardManagerV02 is ILockRewardManagerV02, AccessControl, Pausable,
     }
 
     // -------------------------------------------------------------------------
+    // Forced exit — two-key authorization (guardian + admin)
+    // -------------------------------------------------------------------------
+
+    /// @inheritdoc ILockRewardManagerV02
+    function approveForceExit(uint256 lockId)
+        external
+        override
+        onlyRole(EMERGENCY_ROLE)
+    {
+        forceExitApproved[lockId] = true;
+        emit ForceExitApproved(lockId, msg.sender);
+    }
+
+    /// @inheritdoc ILockRewardManagerV02
+    /// @dev Two-key gate: EMERGENCY_ROLE must call approveForceExit first.
+    ///      Bypasses rebate settlement and RWT return — use only in emergencies.
+    ///      If issuedRewardTokens > 0 those tokens remain with the owner; treasury
+    ///      absorbs the loss. Record the reason on-chain for post-hoc auditability.
+    function executeForceExit(uint256 lockId, string calldata reason)
+        external
+        override
+        nonReentrant
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (!forceExitApproved[lockId]) revert ForceExitNotApproved(lockId);
+        forceExitApproved[lockId] = false; // consume approval (one-shot)
+
+        ILockLedgerV02.LockPosition memory pos = ledger.getLock(lockId);
+        if (pos.owner == address(0)) revert LockNotFound(lockId);
+
+        // Route through ledger's OPERATOR path — shares returned to owner
+        ledger.earlyExitFor(lockId, pos.owner);
+
+        emit ForceExitExecuted(lockId, pos.owner, msg.sender, reason);
+    }
+
+    // -------------------------------------------------------------------------
     // Pause controls
     // -------------------------------------------------------------------------
 
@@ -335,7 +378,11 @@ contract LockRewardManagerV02 is ILockRewardManagerV02, AccessControl, Pausable,
         uint256 lockId,
         ILockLedgerV02.LockPosition memory pos
     ) internal view returns (uint256) {
-        uint256 lastClaimed  = lastRebateClaimedAt[lockId];
+        // If lastRebateClaimedAt was never set (legacy lock not created via lockWithReward),
+        // fall back to lockedAt so elapsed is measured from the day the user locked.
+        uint256 lastClaimed = lastRebateClaimedAt[lockId] != 0
+            ? lastRebateClaimedAt[lockId]
+            : uint256(pos.lockedAt);
         uint256 effectiveNow = block.timestamp < pos.unlockAt
             ? block.timestamp
             : uint256(pos.unlockAt);
