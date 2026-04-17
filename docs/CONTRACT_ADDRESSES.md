@@ -16,7 +16,7 @@
 | Contract | Address | Version |
 |---|---|---|
 | USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Circle |
-| FundVaultV01 | `0x8acaec738F9559F8b025c4372d827D3CD3928322` | V01 |
+| FundVaultV01 | `0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54` | V01 |
 | StrategyManagerV01 | `0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54` | V01 |
 | AaveV3StrategyV01 | `0x621CC4189946128eF2d584F69bb994C84FcA612D` | V01 |
 | RewardToken | `0xeAb54e7cFbE5d35ea5203854B44C8516201534A9` | — |

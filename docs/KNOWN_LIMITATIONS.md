@@ -16,7 +16,7 @@ These are deliberate simplifications for a demo build — not production-ready v
 |---|---|---|
 | MockUSDC | Publicly mintable — no role or faucet needed | Real asset with access controls |
 | DummyStrategy | No autonomous yield — admin manually simulates | Live Aave V3 or equivalent yield source |
-| `mgmtFeeBpsPerMonth` | 100 bps (1%/month) | Subject to governance and market rate |
+| `mgmtFeeBpsPerMonth` | 9 bps/month (~1.08%/year) | Subject to governance and market rate; contract cap 200 bps/month |
 | `reserveRatioBps` | 3,000 bps (30%) | Optimized per strategy liquidity profile |
 | RWT total supply | 1,000,000 RWT fixed at deploy | Token design and emission schedule TBD |
 | Tier durations | 30 / 90 / 180 days | Could support arbitrary durations in V3 |

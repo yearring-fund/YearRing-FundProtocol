@@ -26,19 +26,20 @@ Defined in `LockRewardManagerV02.sol`.
 ```
 RWT issued = lockedUSDCValue × durationDays × multiplierBps
              ─────────────────────────────────────────────────
-                        10,000 × 50
+                           REWARD_DENOMINATOR
+
+REWARD_DENOMINATOR = 10,000 × 500 = 5,000,000
 ```
 
 Where:
 - `lockedUSDCValue` = `vault.convertToAssets(lockedShares)` — in USDC (6 decimals)
 - `durationDays` = lock duration in whole days
 - `multiplierBps` = tier multiplier in basis points (10,000 / 13,000 / 18,000)
-- Denominator = `500,000` (= 10,000 bps × 50 USDC baseline)
 - Result is scaled to 18 decimals via `USDC_TO_TOKEN_SCALE = 10^12`
 
-**Calibration:** 1 USDC locked for 1 day at Bronze tier (1.0×) = 0.02 RWT.
+**Calibration:** 1 USDC locked for 1 day at Bronze tier (1.0×) = 0.002 RWT.
 
-**Example:** 1,000 USDC × 180 days × 1.8 (Gold) = **6,480 RWT** issued upfront.
+**Example:** 1,000 USDC × 180 days × 18,000 (Gold) / 5,000,000 = **648 RWT** issued upfront.
 
 ---
 
@@ -61,11 +62,12 @@ Rebate accrued = mgmtFeeBpsPerMonth × lockedShares × elapsedSeconds
 
 ## Management Fee
 
-Set in `setup_v2.ts` on `FundVaultV01`.
+Set in `scripts/config.ts`, applied via `deploy.ts` or `setup_v2.ts` on `FundVaultV01`.
 
 | Parameter | Value |
 |-----------|-------|
-| `mgmtFeeBpsPerMonth` | **100 bps = 1% / month** |
+| `mgmtFeeBpsPerMonth` | **9 bps/month (~1.08% annualized)** |
+| `MAX_MGMT_FEE_BPS_PER_MONTH` | 200 bps/month (hard cap, contract-enforced) |
 
 Fee accrues to treasury as fbUSDC share dilution. It does not affect `totalAssets` or `pricePerShare` directly — it accrues as treasury shares.
 
@@ -103,7 +105,7 @@ Defined in `LockRewardManagerV02.sol`.
 |------|-------|
 | Principal | Returned in full — no haircut on shares |
 | RWT | Must be returned in full (all `issuedRewardTokens[lockId]`) |
-| Accrued rebate | Forfeited — not payable on early exit |
+| Accrued rebate | Auto-settled and paid to user before exit (already-claimed rebate is also kept) |
 | Availability | Callable any time before `unlockAt` |
 
 User must `approve` RWT to `LockRewardManagerV02` before calling `earlyExitWithReturn`.

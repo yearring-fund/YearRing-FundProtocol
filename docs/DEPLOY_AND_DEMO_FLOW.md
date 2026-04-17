@@ -101,7 +101,7 @@ npx hardhat run scripts/v2/setup_v2.ts --network baseSepolia
 
 - Grants OPERATOR_ROLE to LockRewardManager and BeneficiaryModule
 - Treasury approves LockRewardManager for fbUSDC and RWT (MaxUint256)
-- Sets vault management fee to exactly 100 bps/month
+- Sets vault management fee to 9 bps/month (~1.08% annualized)
 - Fails fast if signer does not match deployment admin address
 
 ### Step 4 — Seed demo positions
@@ -247,7 +247,7 @@ The JSON structure:
     "completedBy": "0x...",
     "fbUSDCApproved": true,
     "rwtApproved": true,
-    "mgmtFeeBpsPerMonth": 100
+    "mgmtFeeBpsPerMonth": 9
   },
   "seed": {
     "seededAt": "...",

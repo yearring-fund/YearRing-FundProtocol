@@ -89,3 +89,22 @@ beneficiary 继承后，originalOwner 在 Merkle 快照中的奖励无法由 ben
 - `BeneficiaryClaimed` 事件触发快照脚本将后续 epoch 的份额重定向至 beneficiary
 - 或：在快照生成脚本（`build_merkle.ts`）中检查 `BeneficiaryClaimed` 事件，
   自动将 originalOwner 份额归入 beneficiary 地址
+
+---
+
+## [VAULT-01] externalTransfersEnabled 开关冗余 — 下个版本移除
+
+**模块**：`FundVaultV01`
+
+**现象**：`transferToStrategyManager()` 有一个独立的 `externalTransfersEnabled` 布尔开关，
+默认 `false`，需要 admin 手动调用 `setExternalTransfersEnabled(true)` 才能开启资金出库路径。
+
+**设计原意**：部署安全门——合约上线初期防止资金意外流向策略，确认 Vault 逻辑验证完毕后再显式开启。
+
+**实际问题**：该开关与已有的多重保护（`systemMode`、`reserveRatioBps`、70% 硬上限）存在职责重叠，
+增加了运营摩擦，且对安全性的增量贡献极低。
+
+**V3 修复方向**：
+- 从 `FundVaultV01` 合约中移除 `externalTransfersEnabled` 状态变量及相关函数
+- 依赖 `systemMode == Normal`、reserve ratio 检查、70% 硬上限作为唯一约束
+- Admin 页面同步移除 Enable/Disable 按钮

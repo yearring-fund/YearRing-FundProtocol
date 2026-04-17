@@ -1,7 +1,7 @@
 // Base Mainnet deployment addresses (Chain ID: 8453)
 export const ADDRESSES = {
   USDC:                 "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`,
-  FundVaultV01:         "0x8acaec738F9559F8b025c4372d827D3CD3928322" as `0x${string}`,
+  FundVaultV01:         "0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54" as `0x${string}`,
   RewardToken:          "0xeAb54e7cFbE5d35ea5203854B44C8516201534A9" as `0x${string}`,
   LockLedgerV02:        "0x2D95517Cc375ab2dc6433fd44A8706462A418a89" as `0x${string}`,
   LockBenefitV02:       "0x083C50F9996b8E1389eB4506e24A2A22Df2C6e1c" as `0x${string}`,
