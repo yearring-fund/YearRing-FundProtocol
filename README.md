@@ -2,7 +2,7 @@
 
 YearRing Fund Protocol is an on-chain fund and long-term capital coordination protocol designed for transparent, rules-based asset management on Base.
 
-The protocol accepts USDC deposits, issues ERC-4626 shares (`fbUSDC`), and deploys capital into approved yield strategies — currently Aave V3 USDC supply. On top of the vault sits a commitment layer: users can voluntarily lock shares for 30–365 days across three tiers (Bronze / Silver / Gold) to earn reward tokens (RWT) and a management fee rebate. Early exit returns full principal on return of issued RWT.
+The protocol accepts USDC deposits, issues ERC-4626 shares (`fbUSDC`), and deploys capital into approved yield strategies — currently Aave V3 USDC supply. On top of the vault sits a commitment layer: users can voluntarily lock shares for 30–365 days across three tiers (Bronze / Silver / Gold) to earn reward tokens (RWT) and a management fee rebate. Early unlock requires returning the originally issued RWT and releases the locked shares according to vault accounting rules.
 
 ---
 
@@ -15,7 +15,7 @@ It is designed as a long-term on-chain capital management container:
 - transparent fund accounting (ERC-4626, on-chain NAV)
 - separated vault and strategy execution layers
 - controlled strategy deployment with hard caps
-- non-negotiable exit rights (redeem path always available)
+- exit rights are designed as a first-class protocol constraint, with normal redeem and emergency claim paths
 - commitment layer that coordinates long-term capital behavior without modifying vault accounting
 - future expansion toward compliant RWA strategies
 
