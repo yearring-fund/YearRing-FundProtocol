@@ -7,3 +7,6 @@ deployments/
 .DS_Store
 dist/
 fd/
+
+# Private outreach, investor communications, and external contact drafts
+/outreach/
