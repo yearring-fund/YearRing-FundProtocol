@@ -2,7 +2,7 @@
 
 YearRing Fund Protocol is an on-chain fund and long-term capital coordination protocol designed to help users access transparent, rules-based, and compounding-oriented asset management strategies onchain.
 
-The protocol starts with simple, auditable strategy containers such as Aave V3 and is designed to expand toward compliant RWA strategies over time.
+The protocol starts with simple, transparent, on-chain strategy containers such as Aave V3 and is designed to expand toward compliant RWA strategies over time.
 
 ## Core Idea
 
@@ -65,7 +65,7 @@ Main responsibilities:
 - reward token distribution;
 - lock-based incentives;
 - management fee discount logic;
-- long-term participation tracking.
+- lock duration and tier tracking.
 
 Main contracts:
 
