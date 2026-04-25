@@ -9,7 +9,7 @@
 
 Si Lugang — Protocol Architect & Builder, Yearring / FinancialBase.
 
-I have built FinancialBase end-to-end: smart contract architecture, deployment infrastructure, test suites, frontend integration, and operational tooling. The protocol has gone from concept to a 613-test, mainnet-deployed system on Base over two years of focused development.
+I have built FinancialBase end-to-end: smart contract architecture, deployment infrastructure, test suites, frontend integration, and operational tooling. The protocol has gone from concept to a 611-test, mainnet-deployed system on Base over two years of focused development.
 
 My approach is engineering-first: every design decision is validated by tests before deployment, and every mechanism (including emergency exits and forced-exit protocols) is built before the feature it protects.
 
@@ -61,7 +61,7 @@ We are replacing each of those trust primitives with smart contract equivalents 
 |---|---|
 | Protocol architecture | Complete |
 | Smart contract development | Complete — V01 + V02 deployed |
-| Test suite | 613 tests passing (unit, integration, Aave V3 fork tests) |
+| Test suite | 611 tests passing (unit, integration, Aave V3 fork tests) |
 | Base mainnet deployment | Live |
 | Strategy integration (Aave V3) | Live |
 | Step 3 — Mainnet deployment and internal readiness | Complete |

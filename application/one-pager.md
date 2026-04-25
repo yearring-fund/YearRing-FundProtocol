@@ -36,7 +36,7 @@ This separation is the design insight most "commitment" protocols miss.
 | | |
 |---|---|
 | Deployment | Base mainnet, live |
-| Test coverage | 613 tests passing |
+| Test coverage | 611 tests passing |
 | Strategy | Aave V3 USDC supply, integrated |
 | Stage | Step 3 internal rehearsal (real USDC, 5 addresses) |
 | Next | Step 4 — first external cohort |
