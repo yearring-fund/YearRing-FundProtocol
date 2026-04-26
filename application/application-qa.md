@@ -121,7 +121,7 @@ We are not applying because we need validation of the thesis. We are applying be
 
 **Q: What stage are you at?**
 
-MVP on mainnet. Internal validation complete. Opening to external users imminently. We are at the beginning of the growth phase.
+MVP on mainnet. Internal validation complete. Preparing a controlled external-user pilot as the next milestone, after finalizing safety boundaries, access controls, and public-facing documentation.
 
 ---
 

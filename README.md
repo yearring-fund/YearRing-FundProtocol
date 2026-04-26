@@ -1,6 +1,6 @@
 # YearRing Fund Protocol
 
-YearRing Fund Protocol is an on-chain fund and long-term capital coordination protocol designed for transparent, rules-based asset management on Base.
+YearRing Fund Protocol is a non-custodial capital container for long-term on-chain users, starting with conservative DeFi yield and expanding toward RWA distribution.
 
 The protocol accepts USDC deposits, issues ERC-4626 shares (`fbUSDC`), and deploys capital into approved yield strategies — currently Aave V3 USDC supply. On top of the vault sits a commitment layer: users can voluntarily lock shares for 30–365 days across three tiers (Bronze / Silver / Gold) to earn reward tokens (RWT) and a management fee rebate. Early unlock requires returning the originally issued RWT and releases the locked shares according to vault accounting rules.
 
@@ -82,6 +82,16 @@ See [ADDRESSES.md](./ADDRESSES.md) for full contract address list with BaseScan 
 
 ## Documentation
 
+| Resource | Description |
+|---|---|
+| `docs/` | Protocol documentation and architecture notes |
+| `ADDRESSES.md` | Public Base mainnet contract addresses |
+| `SECURITY.md` | Security policy, disclosure channel, and known limitations |
+| `application/` | Application-facing narrative and pitch materials |
+| `evidence/` | Mainnet validation evidence and execution records |
+
+**External links:**
+
 | Resource | Link |
 |---|---|
 | Protocol Docs | https://docs.yearringfund.com |
@@ -117,15 +127,16 @@ A formal external audit is planned before broader public user expansion.
 ## Repository Structure
 
 ```
-contracts/          Solidity source — vault, strategy, lock, governance
-scripts/            Operational and deployment scripts (TypeScript / Hardhat)
-test/               Test suite (Hardhat + Chai)
-docs/               Internal protocol documentation and operational runbooks
-deployments/        Deployed contract address records by network
-frontend/           Legacy frontend (V01 demo build)
-org-setup/          Org-level assets (yearring-app, yearring-landing, yearring-docs, yearring-protocol)
-application/        Accelerator and investor application materials
-evidence/           Mainnet operational evidence (snapshots, reports)
+application/        Application-facing narrative and pitch materials
+contracts/          Solidity protocol contracts
+docs/               Protocol documentation and architecture notes
+evidence/           Mainnet validation records and execution evidence
+frontend/           Frontend application
+org-setup/          Public organization setup materials
+scripts/            Hardhat scripts and operational utilities
+test/               Contract tests
+ADDRESSES.md        Public Base mainnet contract addresses
+SECURITY.md         Security policy and disclosure information
 ```
 
 ---

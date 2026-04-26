@@ -71,7 +71,7 @@ We built a dual-signature exit mechanism before building anything else. Convicti
 | Test coverage | 611 tests, full suite passing |
 | Strategy integration | Aave V3 on Base |
 | Internal rehearsal | Step 3 complete |
-| External users | Step 4 — imminent |
+| External users | Step 4 — Controlled external-user pilot in preparation |
 
 ---
 
