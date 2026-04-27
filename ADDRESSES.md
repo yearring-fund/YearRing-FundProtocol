@@ -19,8 +19,8 @@ This document lists the current YearRing Fund Protocol contract addresses deploy
 | StrategyManagerV01 | `0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54` | https://basescan.org/address/0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54 |
 | AaveV3StrategyV01 | `0x621CC4189946128eF2d584F69bb994C84FcA612D` | https://basescan.org/address/0x621CC4189946128eF2d584F69bb994C84FcA612D |
 | RewardToken / RWT | `0xeAb54e7cFbE5d35ea5203854B44C8516201534A9` | https://basescan.org/address/0xeAb54e7cFbE5d35ea5203854B44C8516201534A9 |
-| LockRewardManagerV02 | `0xb29DeFCF75f71bc4DaFaA353cE294C284F5e07cB` | https://basescan.org/address/0xb29DeFCF75f71bc4DaFaA353cE294C284F5e07cB |
-| LockLedgerV02 | `0x2D95517Cc375ab2dc6433fd44A8706462A418a89` | https://basescan.org/address/0x2D95517Cc375ab2dc6433fd44A8706462A418a89 |
+| LockRewardManagerV02 | `0x129aEce0C7659575Ae7aB4e78bfe4ca8946B962a` | https://basescan.org/address/0x129aEce0C7659575Ae7aB4e78bfe4ca8946B962a |
+| LockLedgerV02 | `0x2FC1d315c67AE3Df2a062f7130d58FaA6c0ce9EF` | https://basescan.org/address/0x2FC1d315c67AE3Df2a062f7130d58FaA6c0ce9EF |
 | GovernanceSignalV02 | `0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0` | https://basescan.org/address/0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0 |
 | ProtocolTimelockV02 | `0x054Cb2c32D6062B291420584dE2e5952C372cDD6` | https://basescan.org/address/0x054Cb2c32D6062B291420584dE2e5952C372cDD6 |
 | ClaimLedger | `0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234` | https://basescan.org/address/0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234 |
