@@ -100,6 +100,7 @@ See [ADDRESSES.md](./ADDRESSES.md) for full contract address list with BaseScan 
 | Risk & Audit Status | https://docs.yearringfund.com/risk-and-audit |
 | App | https://app.yearringfund.com |
 | Website | https://yearringfund.com |
+| Contact | hello@yearringfund.com |
 
 ---
 

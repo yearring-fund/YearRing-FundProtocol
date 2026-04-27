@@ -1,5 +1,16 @@
 # GO_NO_GO_CHECKLIST.md — Step3 白名单运行进入决策清单
 
+> **Status: Historical / internal operation checklist.**
+> This checklist was prepared for the Step 3 internal whitelist validation phase.
+> It is not the current authority for protocol governance or admin-role status.
+> For the latest security posture, see [`CURRENT_SECURITY_POSTURE.md`](CURRENT_SECURITY_POSTURE.md).
+>
+> **Note on role assumptions:** Items in this checklist that assume `ADMIN` (deployer EOA) directly holds
+> `DEFAULT_ADMIN_ROLE` on core contracts reflect the state at the time of Step 3 preparation.
+> This assumption has since been superseded by the governance migration completed 2026-04-27,
+> in which `DEFAULT_ADMIN_ROLE` was transferred to `ProtocolTimelockV02` on all core contracts.
+> The checklist content below is preserved for historical reference and does not represent current governance state.
+
 生成时间：2026-04-05
 
 适用阶段：Step3 启动前 / 扩容前 / 任何重大参数变更后

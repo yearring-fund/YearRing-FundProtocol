@@ -9,37 +9,46 @@
 
 **Chain ID:** 8453
 **Deployed:** 2026-04-03 (V01) / 2026-04-06 (V02) / 2026-04-07 (remaining)
-**Deployer / Admin:** `0x087ea7F67d9282f0bdC43627b855F79789C6824C`
-**Guardian:** `0xC8052cF447d429f63E890385a6924464B85c5834`
+**Deployer EOA:** `0x087ea7F67d9282f0bdC43627b855F79789C6824C` — no longer holds DEFAULT_ADMIN_ROLE on core contracts (see governance migration below)
+**Guardian:** `0xC8052cF447d429f63E890385a6924464B85c5834` — holds EMERGENCY_ROLE (pause only)
 **Treasury:** `0x9d16Eb6A6143A3347f8fA5854B5AA675101Fb705`
 
-| Contract | Address | Version |
-|---|---|---|
-| USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Circle |
-| FundVaultV01 | `0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54` | V01 |
-| StrategyManagerV01 | `0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54` | V01 |
-| AaveV3StrategyV01 | `0x621CC4189946128eF2d584F69bb994C84FcA612D` | V01 |
-| RewardToken | `0xeAb54e7cFbE5d35ea5203854B44C8516201534A9` | — |
-| LockLedgerV02 | `0x2D95517Cc375ab2dc6433fd44A8706462A418a89` | V02 |
-| LockBenefitV02 | `0x083C50F9996b8E1389eB4506e24A2A22Df2C6e1c` | V02 |
-| LockRewardManagerV02 | `0xb29DeFCF75f71bc4DaFaA353cE294C284F5e07cB` | V02 |
-| BeneficiaryModuleV02 | `0x0dA3955C58D3252012A76D5CC01E9cc4dfF05C00` | V02 |
-| UserStateEngineV02 | `0x083A92c65A7f586Bc7B8D3D24EE831C217298e18` | V02 |
-| MetricsLayerV02 | `0x1C4Ba691688db06a63AfCde29FF377394BF530F1` | V02 |
-| GovernanceSignalV02 | `0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0` | V02 |
-| ProtocolTimelockV02 | `0x054Cb2c32D6062B291420584dE2e5952C372cDD6` | V02 |
-| ClaimLedger | `0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234` | V02 |
+| Contract | Address | Version | BaseScan |
+|---|---|---|---|
+| USDC | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Circle | https://basescan.org/address/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 |
+| FundVaultV01 | `0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54` | V01 | https://basescan.org/address/0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54 |
+| StrategyManagerV01 | `0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54` | V01 | https://basescan.org/address/0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54 |
+| AaveV3StrategyV01 | `0x621CC4189946128eF2d584F69bb994C84FcA612D` | V01 | https://basescan.org/address/0x621CC4189946128eF2d584F69bb994C84FcA612D |
+| RewardToken | `0xeAb54e7cFbE5d35ea5203854B44C8516201534A9` | — | https://basescan.org/address/0xeAb54e7cFbE5d35ea5203854B44C8516201534A9 |
+| LockLedgerV02 | `0x2FC1d315c67AE3Df2a062f7130d58FaA6c0ce9EF` | V02 | https://basescan.org/address/0x2FC1d315c67AE3Df2a062f7130d58FaA6c0ce9EF |
+| LockRewardManagerV02 | `0x129aEce0C7659575Ae7aB4e78bfe4ca8946B962a` | V02 | https://basescan.org/address/0x129aEce0C7659575Ae7aB4e78bfe4ca8946B962a |
+| BeneficiaryModuleV02 | `0x6d463f7d78Ca3a1809971D5A43E5F57066d325cF` | V02 | https://basescan.org/address/0x6d463f7d78Ca3a1809971D5A43E5F57066d325cF |
+| GovernanceSignalV02 | `0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0` | V02 | https://basescan.org/address/0x9BE5636943d7BfF57ACA6047Cf945FD770CcC7d0 |
+| ProtocolTimelockV02 | `0x054Cb2c32D6062B291420584dE2e5952C372cDD6` | V02 | https://basescan.org/address/0x054Cb2c32D6062B291420584dE2e5952C372cDD6 |
+| ClaimLedger | `0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234` | V02 | https://basescan.org/address/0x5CF9b8EC75314115EDDE5Dd332C193995Dd55234 |
 
 ---
 
-## Post-Deployment Deferred Actions
+## Completed Governance Migration
 
-Actions intentionally deferred until a later milestone. Do not perform these during initial deployment.
+Completed 2026-04-27. Verified on-chain via `scripts/transfer_admin_to_timelock.ts`.
+
+- Core protocol `DEFAULT_ADMIN_ROLE` has been migrated from the deployer EOA to `ProtocolTimelockV02` on all core contracts.
+- The deployer EOA no longer directly controls core contract admin operations.
+- Non-emergency governance operations are subject to a 24-hour timelock delay.
+- Emergency controls (pause / emergency exit) remain directly callable by the `EMERGENCY_ROLE` holder and do not pass through the Timelock.
+- `TIMELOCK_ADMIN_ROLE` is intentionally retained by the deployer EOA until a multisig governance structure is introduced.
+
+For full security posture details, see [`CURRENT_SECURITY_POSTURE.md`](CURRENT_SECURITY_POSTURE.md).
+
+---
+
+## Remaining Deferred Actions
 
 | Action | Contract | Trigger | Detail |
 |---|---|---|---|
-| Revoke deployer `TIMELOCK_ADMIN_ROLE` | ProtocolTimelockV02 | After governance migration is complete | Leaves the timelock self-governed; deployer can no longer modify roles |
-| Grant `VAULT_ROLE` to FundVaultV01 | ClaimLedger | When Exit mode is activated | Allows the Vault to issue and settle claim records on behalf of users |
+| Revoke deployer `TIMELOCK_ADMIN_ROLE` | ProtocolTimelockV02 | After multisig introduced as PROPOSER | Leaves the timelock self-governed; deployer can no longer modify Timelock roles |
+| Grant `VAULT_ROLE` to FundVaultV01 | ClaimLedger | When EmergencyExit mode is activated | Allows the Vault to issue and settle claim records on behalf of users |
 
 ---
 
