@@ -1,35 +1,63 @@
 # YearRing Fund Protocol
 
-YearRing Fund Protocol is a non-custodial capital container for long-term on-chain users, starting with conservative DeFi yield and expanding toward RWA distribution.
+YearRing is a non-custodial capital container for long-term on-chain users, starting with conservative DeFi yield and expanding toward RWA distribution.
 
-The protocol accepts USDC deposits, issues ERC-4626 shares (`fbUSDC`), and deploys capital into approved yield strategies — currently Aave V3 USDC supply. On top of the vault sits a commitment layer: users can voluntarily lock shares for 30–365 days across three tiers (Bronze / Silver / Gold) to earn reward tokens (RWT) and a management fee rebate. Early unlock requires returning the originally issued RWT and releases the locked shares according to vault accounting rules.
-
----
-
-## Core Idea
-
-YearRing is not a short-term yield product.
-
-It is designed as a long-term on-chain capital management container:
-
-- transparent fund accounting (ERC-4626, on-chain NAV)
-- separated vault and strategy execution layers
-- controlled strategy deployment with hard caps
-- exit rights are designed as a first-class protocol constraint, with normal redeem and emergency claim paths
-- commitment layer that coordinates long-term capital behavior without modifying vault accounting
-- future expansion toward compliant RWA strategies
+The protocol accepts USDC deposits, issues ERC-4626 shares (`fbUSDC`), and deploys capital into approved yield strategies — currently Aave V3 USDC supply. On top of the vault sits a commitment layer: participants can lock shares for 30–365 days across three tiers (Bronze / Silver / Gold) to earn reward tokens (RWT) and a management fee rebate. Exit rights are a first-class protocol constraint — normal redeem and emergency claim paths are always structurally preserved.
 
 ---
 
-## Current Status
+## Official Links
 
-| Item | Status |
+| | |
 |---|---|
-| Capital layer (FundVaultV01 + StrategyManagerV01 + AaveV3StrategyV01) | Deployed on Base mainnet |
-| Commitment layer (LockRewardManagerV02 + LockLedgerV02) | Deployed on Base mainnet |
-| Governance (GovernanceSignalV02 + ProtocolTimelockV02) | Deployed on Base mainnet |
-| Access | Invited whitelist — internal validation phase |
-| External audit | Pending |
+| Website | https://yearringfund.com |
+| App | https://app.yearringfund.com |
+| Docs | https://docs.yearringfund.com |
+| GitHub | https://github.com/yearring-fund |
+| Contact | hello@yearringfund.com |
+
+---
+
+## Mainnet Deployment
+
+Deployed on Base mainnet (Chain ID 8453).
+
+| Contract | Address |
+|---|---|
+| FundVaultV01 | [`0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54`](https://basescan.org/address/0x9dD61ee543a9C51aBe7B26A89687C9aEeea98a54) |
+| StrategyManagerV01 | [`0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54`](https://basescan.org/address/0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54) |
+| AaveV3StrategyV01 | [`0x621CC4189946128eF2d584F69bb994C84FcA612D`](https://basescan.org/address/0x621CC4189946128eF2d584F69bb994C84FcA612D) |
+| LockRewardManagerV02 | [`0x129aEce0C7659575Ae7aB4e78bfe4ca8946B962a`](https://basescan.org/address/0x129aEce0C7659575Ae7aB4e78bfe4ca8946B962a) |
+| LockLedgerV02 | [`0x2FC1d315c67AE3Df2a062f7130d58FaA6c0ce9EF`](https://basescan.org/address/0x2FC1d315c67AE3Df2a062f7130d58FaA6c0ce9EF) |
+| ProtocolTimelockV02 | [`0x054Cb2c32D6062B291420584dE2e5952C372cDD6`](https://basescan.org/address/0x054Cb2c32D6062B291420584dE2e5952C372cDD6) |
+
+Full address list with all contracts: [ADDRESSES.md](./ADDRESSES.md)
+
+---
+
+## Security Status
+
+The protocol is currently unaudited and should be treated as an early-stage mainnet validation. User-facing access is limited while safety boundaries are being finalized.
+
+- Admin roles are governed by `ProtocolTimelockV02` (24-hour delay on all non-emergency changes)
+- Emergency controls are limited to pause and emergency exit — cannot redirect funds
+- Vault and strategy layers are separated with on-chain exposure caps
+- External audit is pending before broader public expansion
+
+See [SECURITY.md](./SECURITY.md) for responsible disclosure and [docs/CURRENT_SECURITY_POSTURE.md](./docs/CURRENT_SECURITY_POSTURE.md) for full governance state.
+
+---
+
+## Application Materials
+
+| Resource | Description |
+|---|---|
+| [one-pager.md](./application/one-pager.md) | Protocol overview: problem, solution, differentiators |
+| [pitch-framework.md](./application/pitch-framework.md) | Conviction Markets narrative and OV thesis alignment |
+| [application-qa.md](./application/application-qa.md) | Accelerator application Q&A |
+| [YearRing_Fund_Protocol_Deck.pdf](./application/YearRing_Fund_Protocol_Deck.pdf) | Investor deck (PDF) |
+
+Mainnet validation evidence: [evidence/](./evidence/)
 
 ---
 
@@ -72,11 +100,16 @@ Main contracts: `RewardToken`, `LockRewardManagerV02`, `LockLedgerV02`
 
 ---
 
-## Mainnet Deployment
+## Current Status
 
-Deployed on Base mainnet (Chain ID 8453).
-
-See [ADDRESSES.md](./ADDRESSES.md) for full contract address list with BaseScan links.
+| Item | Status |
+|---|---|
+| Capital layer (FundVaultV01 + StrategyManagerV01 + AaveV3StrategyV01) | Deployed on Base mainnet |
+| Commitment layer (LockRewardManagerV02 + LockLedgerV02) | Deployed on Base mainnet |
+| Governance (GovernanceSignalV02 + ProtocolTimelockV02) | Deployed on Base mainnet |
+| Admin role migration to Timelock | Complete |
+| Access | Invited whitelist — internal validation phase |
+| External audit | Pending |
 
 ---
 
@@ -85,55 +118,23 @@ See [ADDRESSES.md](./ADDRESSES.md) for full contract address list with BaseScan 
 | Resource | Description |
 |---|---|
 | `docs/` | Protocol documentation and architecture notes |
-| `ADDRESSES.md` | Public Base mainnet contract addresses |
-| `SECURITY.md` | Security policy, disclosure channel, and known limitations |
-| `application/` | Application-facing narrative and pitch materials |
-| `evidence/` | Mainnet validation evidence and execution records |
+| `docs/CURRENT_SECURITY_POSTURE.md` | Current governance and security state |
+| `ADDRESSES.md` | Full Base mainnet contract address list |
+| `SECURITY.md` | Security policy and responsible disclosure |
+| `evidence/` | Mainnet validation records and execution evidence |
 
-**External links:**
-
-| Resource | Link |
-|---|---|
-| Protocol Docs | https://docs.yearringfund.com |
-| Whitepaper | https://docs.yearringfund.com/whitepaper |
-| Architecture | https://docs.yearringfund.com/architecture |
-| Risk & Audit Status | https://docs.yearringfund.com/risk-and-audit |
-| App | https://app.yearringfund.com |
-| Website | https://yearringfund.com |
-| Contact | hello@yearringfund.com |
-
----
-
-## Audit Status
-
-**External audit: Pending**
-
-The protocol has not yet completed a third-party external audit. It is currently deployed for controlled internal validation with an invited whitelist.
-
-Security model includes:
-
-- role-based access control (DEFAULT_ADMIN_ROLE, EMERGENCY_ROLE, PROPOSER_ROLE)
-- 24-hour ProtocolTimelockV02 for all admin parameter changes
-- EMERGENCY_ROLE limited to pause and emergency exit only — cannot redirect funds or modify parameters
-- separated vault and strategy manager (no direct access between layers)
-- reserve and strategy exposure limits (on-chain constants, not configurable)
-- mainnet transaction traceability through BaseScan
-
-See [SECURITY.md](./SECURITY.md) for responsible disclosure policy.
-
-A formal external audit is planned before broader public user expansion.
+External documentation: https://docs.yearringfund.com
 
 ---
 
 ## Repository Structure
 
 ```
-application/        Application-facing narrative and pitch materials
+application/        Investor and accelerator application materials (deck, narrative, Q&A)
 contracts/          Solidity protocol contracts
 docs/               Protocol documentation and architecture notes
 evidence/           Mainnet validation records and execution evidence
 frontend/           Frontend application
-org-setup/          Public organization setup materials
 scripts/            Hardhat scripts and operational utilities
 test/               Contract tests
 ADDRESSES.md        Public Base mainnet contract addresses
@@ -146,27 +147,9 @@ SECURITY.md         Security policy and disclosure information
 
 **Tech stack:** Solidity `^0.8.20`, Hardhat + TypeScript, OpenZeppelin v4, Vite + React + wagmi v2
 
-**Install dependencies:**
-
 ```bash
 npm install
-```
-
-**Run full test suite:**
-
-```bash
 npx hardhat test
-```
-
-**Run a specific test file:**
-
-```bash
-npx hardhat test test/Step3_LiveRun.test.ts
-```
-
-**Compile contracts:**
-
-```bash
 npx hardhat compile
 ```
 
@@ -174,9 +157,7 @@ npx hardhat compile
 
 ## Disclaimer
 
-YearRing Fund Protocol is experimental software.
-
-This repository and its contents are provided for transparency and technical review. Nothing here constitutes financial advice, investment advice, or a public solicitation.
+YearRing Fund Protocol is experimental software. This repository and its contents are provided for transparency and technical review. Nothing here constitutes financial advice, investment advice, or a public solicitation.
 
 Users should understand smart contract, DeFi, liquidity, strategy, and regulatory risks before interacting with the protocol. No yield is guaranteed. Strategy returns depend on Aave V3 supply rates, which may vary or reach zero.
 
