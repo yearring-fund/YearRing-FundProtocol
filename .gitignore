@@ -28,6 +28,12 @@ fd/
 # Private outreach, investor communications, and external contact drafts
 outreach/
 
+# Application materials (binary / confidential)
+application/*.pptx
+application/*.pdf
+application/*.key
+application/*.pages
+
 # Logs
 *.log
 npm-debug.log*
