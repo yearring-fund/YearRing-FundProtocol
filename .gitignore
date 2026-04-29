@@ -34,6 +34,9 @@ application/*.pdf
 application/*.key
 application/*.pages
 
+# Org setup / GitHub org configuration (managed separately)
+org-setup/
+
 # Logs
 *.log
 npm-debug.log*
