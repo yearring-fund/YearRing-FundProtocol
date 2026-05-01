@@ -12,6 +12,7 @@ import Positions from './pages/Positions'
 import Beneficiary from './pages/Beneficiary'
 import Governance from './pages/Governance'
 import Claim from './pages/Claim'
+import Community from './pages/Community'
 
 function NetworkGuard({ children }: { children: React.ReactNode }) {
   const chainId = useChainId()
@@ -117,6 +118,7 @@ const NAV_ITEMS = [
   { path: '/beneficiary', label: 'Beneficiary' },
   { path: '/governance',  label: 'Governance'  },
   { path: '/claim',       label: 'Claim'       },
+  { path: '/community',   label: 'Community'   },
 ]
 
 export default function App() {
@@ -174,6 +176,7 @@ export default function App() {
             <Route path="/beneficiary" element={<Beneficiary />} />
             <Route path="/governance"  element={<Governance />} />
             <Route path="/claim"       element={<Claim />} />
+            <Route path="/community"   element={<Community />} />
           </Routes>
         </main>
       </NetworkGuard>
