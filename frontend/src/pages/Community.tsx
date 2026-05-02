@@ -1,5 +1,4 @@
-// TODO: Replace DISCORD_URL with the official YearRing Discord invite link when available
-const DISCORD_URL = '#TODO_DISCORD'
+const DISCORD_URL = 'https://discord.gg/gtrBCjYNdB'
 
 // TODO: Replace X_URL with the official YearRing X (Twitter) profile URL when available
 const X_URL = '#TODO_X_TWITTER'
@@ -24,6 +23,52 @@ export default function Community() {
           <span className="badge badge-blue">Early Stage</span>
           <span className="badge badge-gray">Invite-Adjacent</span>
           <span className="badge badge-gray">Base Mainnet</span>
+        </div>
+      </div>
+
+      {/* ── Discord CTA ─────────────────────────────────────────── */}
+      <div
+        className="card"
+        style={{
+          marginBottom: 16,
+          border: '1px solid #1a3a5c',
+          background: '#0a1e2e',
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--blue)', marginBottom: 6 }}>
+          Join the YearRing Community
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.8, marginBottom: 16 }}>
+          The official Discord is the main space for community updates, early feedback, product
+          questions, and security notices.
+        </div>
+        <a
+          href={DISCORD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ textDecoration: 'none' }}
+        >
+          <button className="btn-primary" style={{ fontSize: 13, padding: '8px 20px', cursor: 'pointer' }}>
+            Join the official Discord
+          </button>
+        </a>
+        <div
+          style={{
+            marginTop: 16,
+            paddingTop: 14,
+            borderTop: '1px solid #1a3a5c',
+            fontSize: 12,
+            color: 'var(--muted)',
+            lineHeight: 1.7,
+            display: 'flex',
+            gap: 8,
+            alignItems: 'flex-start',
+          }}
+        >
+          <span style={{ color: 'var(--yellow)', flexShrink: 0 }}>⚠</span>
+          YearRing admins will never ask for seed phrases, private keys, private wallet access,
+          direct transfers, or wallet validation links. Always verify official links through the
+          Discord #official-links channel.
         </div>
       </div>
 
@@ -329,16 +374,17 @@ export default function Community() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-          {/* TODO: Replace DISCORD_URL constant at the top of this file with the official invite link */}
           <a
             href={DISCORD_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 12,
               padding: '10px 14px',
               background: 'var(--bg)',
-              border: '1px solid var(--border)',
+              border: '1px solid #1a3a5c',
               borderRadius: 6,
               color: 'var(--text)',
               fontSize: 13,
@@ -352,7 +398,7 @@ export default function Community() {
             <span style={{ color: 'var(--muted)', flex: 1, minWidth: 160 }}>
               Official community server — discussions, feedback, announcements
             </span>
-            <span className="badge badge-gray" style={{ flexShrink: 0 }}>Coming Soon</span>
+            <span className="badge badge-blue" style={{ flexShrink: 0 }}>Official</span>
           </a>
 
           {/* TODO: Replace X_URL constant at the top of this file with the official X profile URL */}
@@ -410,8 +456,8 @@ export default function Community() {
         </div>
         <div className="note" style={{ marginTop: 12 }}>
           Links marked <span className="badge badge-gray" style={{ fontSize: 10, marginLeft: 2, marginRight: 2 }}>Coming Soon</span> are
-          placeholders pending official channel launch. Do not use third-party links until the
-          official addresses are confirmed here.
+          pending official channel launch. Do not use third-party links. Discord is now live —
+          all other channels will be confirmed here when available.
         </div>
       </div>
 
