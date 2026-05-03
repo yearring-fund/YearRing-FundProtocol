@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import yrfpLogo from './assets/YRFP.svg'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import { useAccount, useChainId, useSwitchChain, useReadContract } from 'wagmi'
 import { BASE_ID } from './wagmiConfig'
@@ -136,7 +137,7 @@ export default function App() {
       {/* Sticky header */}
       <header>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div className="logo">YearRing Fund</div>
+          <img src={yrfpLogo} alt="YearRing Fund Protocol" style={{ height: 36, width: 36, display: 'block' }} />
           <nav className="nav-tabs">
             {NAV_ITEMS.map(item => (
               <NavLink
