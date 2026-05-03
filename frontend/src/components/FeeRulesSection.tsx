@@ -96,7 +96,7 @@ export default function FeeRulesSection() {
         </p>
       </div>
 
-      <button className="btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={refetch}>
+      <button className="btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={() => refetch()}>
         ↻ Refresh
       </button>
     </div>

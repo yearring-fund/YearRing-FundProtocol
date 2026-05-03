@@ -110,7 +110,7 @@ export default function Dashboard() {
   })
 
   // Locked shares from MetricsLayer
-  const lockedShares = snapshot?.[1] ?? 0n
+  const lockedShares = snapshot?.totalLockedShares ?? 0n
   const freeShares = fbUsdcBal !== undefined && fbUsdcBal > lockedShares
     ? fbUsdcBal - lockedShares
     : fbUsdcBal ?? 0n
@@ -159,7 +159,7 @@ export default function Dashboard() {
         <div className="card-title">Protocol</div>
         <div className="info-row">
           <span className="info-label">Total TVL</span>
-          <span className="info-value">{fmtUsdc(snapshot?.[0])}</span>
+          <span className="info-value">{fmtUsdc(snapshot?.totalTVL)}</span>
         </div>
         <div className="info-row">
           <span className="info-label">Price Per Share</span>
@@ -167,11 +167,11 @@ export default function Dashboard() {
         </div>
         <div className="info-row">
           <span className="info-label">Lock Ratio</span>
-          <span className="info-value">{fmtBps(snapshot?.[2])}</span>
+          <span className="info-value">{fmtBps(snapshot?.lockedRatioBps)}</span>
         </div>
         <div className="info-row">
           <span className="info-label">Total Locks Ever</span>
-          <span className="info-value">{snapshot?.[3]?.toString() ?? '–'}</span>
+          <span className="info-value">{snapshot?.totalLocksEver?.toString() ?? '–'}</span>
         </div>
         <hr className="divider" />
         <div className="info-row">

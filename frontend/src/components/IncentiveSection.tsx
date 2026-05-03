@@ -20,7 +20,7 @@ export default function IncentiveSection() {
         <span className="info-label">RWT Balance</span>
         <span className="info-value">{fmtRwt(rwtBal as bigint | undefined)}</span>
       </div>
-      <button className="btn-secondary btn-sm" style={{ marginTop: 4 }} onClick={refetch}>↻ Refresh</button>
+      <button className="btn-secondary btn-sm" style={{ marginTop: 4 }} onClick={() => refetch()}>↻ Refresh</button>
 
       <hr className="divider" />
 
