@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits } from 'viem'
 import { ADDRESSES } from '../contracts/addresses'
-import { FundVault_ABI, LockLedger_ABI, LockRewardManager_ABI } from '../contracts/abis'
-import { fmtShares, fmtRwt, shortErr, DURATION_30D, DURATION_90D, DURATION_180D } from '../utils'
+import { FundVault_ABI, LockLedger_ABI, LockPointsRebateManager_ABI } from '../contracts/abis'
+import { fmtShares, fmtPoints, shortErr, DURATION_30D, DURATION_90D, DURATION_180D } from '../utils'
 import LockRow from './LockRow'
 
 type OpType = 'approve' | 'lock' | null
@@ -14,8 +14,8 @@ const DURATIONS = [
   { label: 'Gold — 180 days',   seconds: DURATION_180D, tier: 'Gold',   discount: '60%', multiplier: '1.8×', days: 180n, multiplierBps: 18_000n },
 ]
 
-const REWARD_DENOMINATOR = 5_000_000n
-const USDC_TO_TOKEN_SCALE = 1_000_000_000_000n  // 1e12
+const POINTS_DENOMINATOR   = 5_000_000n        // 10000 × 500
+const USDC_TO_POINTS_SCALE = 1_000_000_000_000n // 1e12
 
 export default function LockSection() {
   const { address } = useAccount()
@@ -23,12 +23,12 @@ export default function LockSection() {
   const [durIdx, setDurIdx]   = useState(2)  // default Gold
   const [opType, setOpType]   = useState<OpType>(null)
 
-  const configOk = !!ADDRESSES.FundVaultV01 && !!ADDRESSES.LockLedgerV02 && !!ADDRESSES.LockRewardManagerV02
+  const configOk = !!ADDRESSES.YearRingCoreVaultV01 && !!ADDRESSES.LockLedgerV02 && !!ADDRESSES.LockPointsRebateManagerV02
 
   const { data: sharesBal, refetch: refetchBal } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && !!ADDRESSES.FundVaultV01 },
+    query: { enabled: !!address && !!ADDRESSES.YearRingCoreVaultV01 },
   })
 
   const { data: lockIds, refetch: refetchIds } = useReadContract({
@@ -39,11 +39,11 @@ export default function LockSection() {
     query: { enabled: !!address && !!ADDRESSES.LockLedgerV02 },
   })
 
-  // Read fbUSDC allowance to LockLedger — manager checks this value internally
+  // Read yrCORE allowance to LockLedger — LockPointsRebateManagerV02 checks this internally
   const { data: shareAllowance, refetch: refetchAllow } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'allowance',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'allowance',
     args: address ? [address, ADDRESSES.LockLedgerV02] : undefined,
-    query: { enabled: !!address && !!ADDRESSES.FundVaultV01 && !!ADDRESSES.LockLedgerV02 },
+    query: { enabled: !!address && !!ADDRESSES.YearRingCoreVaultV01 && !!ADDRESSES.LockLedgerV02 },
   })
 
   const ids           = (lockIds as bigint[] | undefined) ?? []
@@ -51,19 +51,19 @@ export default function LockSection() {
   const lockAmountBig = lockAmt ? parseUnits(lockAmt, 18) : 0n
   const needsApprove  = !allowance || allowance < lockAmountBig
 
-  // RWT preview: convert entered shares → USDC value (6-dec) for client-side RWT estimate
+  // Points preview: convert entered shares → USDC value (6-dec) for client-side Points estimate
   const { data: lockValueUsdc } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'convertToAssets',
     args: lockAmountBig > 0n ? [lockAmountBig] : undefined,
-    query: { enabled: !!ADDRESSES.FundVaultV01 && lockAmountBig > 0n },
+    query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 && lockAmountBig > 0n },
   })
 
-  const previewRwt = useMemo(() => {
+  const previewPoints = useMemo(() => {
     const usdcVal = lockValueUsdc as bigint | undefined
     if (!usdcVal || lockAmountBig === 0n) return undefined
     const { days, multiplierBps } = DURATIONS[durIdx]
-    return usdcVal * USDC_TO_TOKEN_SCALE * days * multiplierBps / REWARD_DENOMINATOR
+    return usdcVal * USDC_TO_POINTS_SCALE * days * multiplierBps / POINTS_DENOMINATOR
   }, [lockValueUsdc, lockAmountBig, durIdx])
 
   const { writeContract, isPending, data: hash, error } = useWriteContract()
@@ -86,21 +86,21 @@ export default function LockSection() {
     if (needsApprove) {
       setOpType('approve')
       writeContract({
-        address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'approve',
+        address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'approve',
         args: [ADDRESSES.LockLedgerV02, lockAmountBig],
       })
     } else {
       setOpType('lock')
       writeContract({
-        address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
-        functionName: 'lockWithReward', args: [lockAmountBig, BigInt(DURATIONS[durIdx].seconds)],
+        address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
+        functionName: 'lockWithPoints', args: [lockAmountBig, BigInt(DURATIONS[durIdx].seconds)],
       })
     }
   }
 
   const lockBtnLabel =
     busy && (opType === 'approve' || opType === 'lock') ? 'Pending…' :
-    needsApprove ? 'Approve fbUSDC' : 'Lock + Earn RWT'
+    needsApprove ? 'Approve yrCORE shares' : 'Lock + Earn Points'
 
   const tier = DURATIONS[durIdx]
 
@@ -109,7 +109,7 @@ export default function LockSection() {
       <div className="card-title">Lock</div>
 
       <div className="info-row">
-        <span className="info-label">Available fbUSDC</span>
+        <span className="info-label">Available yrCORE shares</span>
         <span className="info-value">{fmtShares(sharesBal as bigint | undefined)}</span>
       </div>
       <button className="btn-secondary btn-sm" style={{ marginTop: 4 }} onClick={refetch}>↻ Refresh</button>
@@ -127,16 +127,16 @@ export default function LockSection() {
 
       {/* Tier preview */}
       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, padding: '6px 8px', background: 'var(--bg)', borderRadius: 4, border: '1px solid var(--border)' }}>
-        <strong>{tier.tier}</strong> · {tier.discount} fee rebate · {tier.multiplier} RWT multiplier
-        {previewRwt !== undefined && (
+        <strong>{tier.tier}</strong> · {tier.discount} fee rebate · {tier.multiplier} Points multiplier
+        {previewPoints !== undefined && (
           <span style={{ marginLeft: 8, color: 'var(--blue)' }}>
-            → Estimated RWT: <strong>{fmtRwt(previewRwt)}</strong>
+            → Estimated Points: <strong>{fmtPoints(previewPoints)}</strong>
           </span>
         )}
       </div>
 
       <div className="field">
-        <label>Amount to lock (fbUSDC shares — e.g. 100)</label>
+        <label>Amount to lock (yrCORE shares — e.g. 100)</label>
         <input type="number" placeholder="e.g. 100" value={lockAmt} onChange={e => setLockAmt(e.target.value)} />
       </div>
 
@@ -154,16 +154,13 @@ export default function LockSection() {
         </button>
       </div>
 
-      {busy     && opType && <div className="status info">{opType === 'approve' ? 'Approving fbUSDC…' : 'Locking + issuing RWT…'}</div>}
+      {busy     && opType && <div className="status info">{opType === 'approve' ? 'Approving yrCORE shares…' : 'Locking + issuing Points…'}</div>}
       {isSuccess          && <div className="status ok">Done — lock created. See positions below.</div>}
       {error              && <div className="status err">{shortErr(error)}</div>}
 
       <p className="note">
-        Button auto-switches: <em>Approve fbUSDC</em> when allowance is insufficient (approval targets LockLedger),
-        then <em>Lock + Earn RWT</em>. RWT is issued upfront from treasury at lock time.
-        <br />
-        On testnet, lock entry is live. Full maturity/unlock is demonstrated via local full demo
-        or pre-seeded positions in the Demo State section below.
+        Button auto-switches: <em>Approve yrCORE shares</em> when allowance is insufficient (approval targets LockLedger),
+        then <em>Lock + Earn Points</em>. Points are issued upfront from treasury at lock time.
       </p>
 
       {ids.length > 0 && (

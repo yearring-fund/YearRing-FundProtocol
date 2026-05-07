@@ -9,7 +9,7 @@ function assetTypeLabel(addr: string): string {
   if (!addr || addr === '0x0000000000000000000000000000000000000000') return 'Unknown'
   // Compare lowercase
   if (addr.toLowerCase() === ADDRESSES.USDC.toLowerCase()) return 'USDC'
-  if (addr.toLowerCase() === ADDRESSES.FundVaultV01.toLowerCase()) return 'fbUSDC'
+  if (addr.toLowerCase() === ADDRESSES.YearRingCoreVaultV01.toLowerCase()) return 'yrCORE shares'
   return addr.slice(0, 6) + '…' + addr.slice(-4)
 }
 

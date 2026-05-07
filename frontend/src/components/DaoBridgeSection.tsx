@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
-import { Governance_ABI, RewardToken_ABI } from '../contracts/abis'
-import { fmtRwt, fmtTs, shortErr } from '../utils'
+import { Governance_ABI, PointsToken_ABI } from '../contracts/abis'
+import { fmtPoints, fmtTs, shortErr } from '../utils'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PROPOSAL_TYPE_LABELS = ['Reward Rate Signal', 'Fee Discount Signal', 'Inactivity Threshold Signal', 'General Signal']
+const PROPOSAL_TYPE_LABELS = ['Reward Rate Signal', 'Rebate Signal', 'Inactivity Threshold Signal', 'General Signal']
 const PROPOSAL_STATE_LABELS = ['Active', 'Succeeded', 'Defeated']
 const PROPOSAL_STATE_BADGES = ['badge-blue', 'badge-green', 'badge-red']
 const VOTE_TYPE = { For: 0, Against: 1, Abstain: 2 } as const
@@ -80,9 +80,9 @@ function ProposalCard({ proposalId, address }: { proposalId: bigint; address: `0
           <div className="vote-bar-against" style={{ width: againstPct + '%' }} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-          <span style={{ color: 'var(--green)' }}>For {fmtRwt(p.forVotes)} ({forPct}%)</span>
-          <span>Abstain {fmtRwt(p.abstainVotes)}</span>
-          <span style={{ color: 'var(--red)' }}>Against {fmtRwt(p.againstVotes)} ({againstPct}%)</span>
+          <span style={{ color: 'var(--green)' }}>For {fmtPoints(p.forVotes)} ({forPct}%)</span>
+          <span>Abstain {fmtPoints(p.abstainVotes)}</span>
+          <span style={{ color: 'var(--red)' }}>Against {fmtPoints(p.againstVotes)} ({againstPct}%)</span>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ function ProposalCard({ proposalId, address }: { proposalId: bigint; address: `0
       {address && (
         <div className="info-row" style={{ marginTop: 6 }}>
           <span className="info-label">Your voting power for this proposal (snapshot)</span>
-          <span>{fmtRwt(power)}</span>
+          <span>{fmtPoints(power)}</span>
         </div>
       )}
 
@@ -122,11 +122,11 @@ export default function DaoBridgeSection() {
   const gov         = ADDRESSES.GovernanceSignalV02
   const govDeployed = !!gov
 
-  // Real-time RWT balance (global voting power)
+  // Real-time Points balance (global voting power)
   const { data: rwtBal, refetch: refetchBal } = useReadContract({
-    address: ADDRESSES.RewardToken, abi: RewardToken_ABI, functionName: 'balanceOf',
+    address: ADDRESSES.PointsToken, abi: PointsToken_ABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: !!address && !!ADDRESSES.RewardToken },
+    query: { enabled: !!address && !!ADDRESSES.PointsToken },
   })
 
   // Proposal count
@@ -169,14 +169,14 @@ export default function DaoBridgeSection() {
         <button className="btn-secondary btn-sm" onClick={() => { refetchBal(); refetchIds() }}>↻ Refresh</button>
       </div>
 
-      {/* ── Current RWT Balance ── */}
+      {/* ── Current Points Balance ── */}
       <div className="dao-bridge-power">
         <div>
-          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Current RWT Balance</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{fmtRwt(rwtBal as bigint | undefined)}</div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 2 }}>Current Points Balance</div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>{fmtPoints(rwtBal as bigint | undefined)}</div>
           {thresholdVal !== undefined && (
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-              Minimum proposal threshold: {fmtRwt(thresholdVal)}
+              Minimum proposal threshold: {fmtPoints(thresholdVal)}
               {rwtBal !== undefined && (rwtBal as bigint) >= thresholdVal
                 ? <span style={{ color: 'var(--green)', marginLeft: 6 }}>✓ Eligible</span>
                 : <span style={{ color: 'var(--red)',   marginLeft: 6 }}>✗ Insufficient balance</span>
@@ -185,7 +185,7 @@ export default function DaoBridgeSection() {
           )}
         </div>
         <div style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 320, lineHeight: 1.6 }}>
-          This shows your real-time RWT balance, used to determine proposal eligibility.<br />
+          This shows your real-time Points balance, used to determine proposal eligibility.<br />
           Actual voting power is snapshot-locked at each proposal's creation time — see the Snapshot Voting Power field in each proposal card.
         </div>
       </div>
@@ -218,7 +218,7 @@ export default function DaoBridgeSection() {
             <div className="dao-bridge-placeholder">
               <p style={{ color: 'var(--muted)', fontSize: 13 }}>No proposals yet. Proposals are created by the admin.</p>
               <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 6 }}>
-                There are no active proposals, so only your real-time RWT balance is shown here — it does not represent snapshot voting power for any proposal.
+                There are no active proposals, so only your real-time Points balance is shown here — it does not represent snapshot voting power for any proposal.
               </p>
             </div>
           ) : visibleIds.length === 0 ? (

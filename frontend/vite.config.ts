@@ -7,10 +7,10 @@ export default defineConfig({
   build: {
     outDir: 'dist/step4',
     rollupOptions: {
-      input: 'step4.html',
+      input: 'index.html',
     },
   },
   server: {
-    open: '/step4.html',
+    open: '/',
   },
 })

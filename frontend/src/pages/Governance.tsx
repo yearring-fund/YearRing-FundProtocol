@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useAccount, useChainId, useReadContract, useWriteContract } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
-import { Governance_ABI, RewardToken_ABI } from '../contracts/abis'
-import { fmtTs, fmtRwt, shortErr } from '../utils'
+import { Governance_ABI } from '../contracts/abis'
+import { fmtTs, fmtPoints, shortErr } from '../utils'
 import { BASE_ID } from '../wagmiConfig'
 
 type VoteStep = 'idle' | 'busy' | 'done' | 'error'
@@ -113,14 +113,14 @@ function ProposalCard({ proposalId, userAddr }: { proposalId: bigint; userAddr: 
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
-        <span style={{ color: 'var(--green)' }}>For: {fmtRwt(proposal.forVotes)}</span>
-        <span style={{ color: 'var(--red)' }}>Against: {fmtRwt(proposal.againstVotes)}</span>
-        <span style={{ color: 'var(--muted)' }}>Abstain: {fmtRwt(proposal.abstainVotes)}</span>
+        <span style={{ color: 'var(--green)' }}>For: {fmtPoints(proposal.forVotes)}</span>
+        <span style={{ color: 'var(--red)' }}>Against: {fmtPoints(proposal.againstVotes)}</span>
+        <span style={{ color: 'var(--muted)' }}>Abstain: {fmtPoints(proposal.abstainVotes)}</span>
       </div>
 
       {userAddr && (
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)' }}>
-          Your voting power (snapshot): {votingPower !== undefined ? fmtRwt(votingPower) : '–'}
+          Your voting power (snapshot): {votingPower !== undefined ? fmtPoints(votingPower) : '–'}
           {voted && <span className="badge badge-gray" style={{ marginLeft: 8 }}>Voted</span>}
         </div>
       )}

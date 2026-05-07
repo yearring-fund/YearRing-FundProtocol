@@ -7,7 +7,7 @@ import {
 } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
 import { FundVault_ABI } from '../contracts/abis'
-import { D6, fmtUsdc, fmtShares, fmtPps, shortErr } from '../utils'
+import { parseUsdcInput, parseSharesInput, formatSharesForInput, fmtUsdc, fmtShares, fmtPps, shortErr } from '../utils'
 import { BASE_ID } from '../wagmiConfig'
 
 const USDC_ABI = [
@@ -48,9 +48,7 @@ function DepositSection() {
   const [txHashApprove, setTxHashApprove] = useState('')
   const [txHashDeposit, setTxHashDeposit] = useState('')
 
-  const amountBn = (() => {
-    try { return amount ? D6(parseFloat(amount)) : 0n } catch { return 0n }
-  })()
+  const amountBn = parseUsdcInput(amount)
 
   const { data: usdcBal, refetch: refetchBal } = useReadContract({
     address: ADDRESSES.USDC, abi: USDC_ABI, functionName: 'balanceOf',
@@ -59,28 +57,28 @@ function DepositSection() {
   })
   const { data: usdcAllowance, refetch: refetchAllowance } = useReadContract({
     address: ADDRESSES.USDC, abi: USDC_ABI, functionName: 'allowance',
-    args: address ? [address, ADDRESSES.FundVaultV01] : undefined,
+    args: address ? [address, ADDRESSES.YearRingCoreVaultV01] : undefined,
     query: { enabled: enabled && !!address },
   })
   const { data: depositsPaused } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'depositsPaused',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'depositsPaused',
     query: { enabled },
   })
   const { data: systemMode } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'systemMode',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'systemMode',
     query: { enabled },
   })
   const { data: isAllowed } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'isAllowed',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'isAllowed',
     args: address ? [address] : undefined,
     query: { enabled: enabled && !!address },
   })
   const { data: pps } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'pricePerShare',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'pricePerShare',
     query: { enabled },
   })
   const { data: preview } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'previewDeposit',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'previewDeposit',
     args: amountBn > 0n ? [amountBn] : undefined,
     query: { enabled: enabled && amountBn > 0n },
   })
@@ -116,7 +114,7 @@ function DepositSection() {
         setStep('approving')
         const hash = await writeContractAsync({
           address: ADDRESSES.USDC, abi: USDC_ABI, functionName: 'approve',
-          args: [ADDRESSES.FundVaultV01, amountBn],
+          args: [ADDRESSES.YearRingCoreVaultV01, amountBn],
         })
         setTxHashApprove(hash)
         setStep('approve-wait')
@@ -130,7 +128,7 @@ function DepositSection() {
       }
       setStep('depositing')
       const hash = await writeContractAsync({
-        address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'deposit',
+        address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'deposit',
         args: [amountBn, address!],
       })
       setTxHashDeposit(hash)
@@ -240,39 +238,37 @@ function RedeemSection() {
   const [errMsg, setErrMsg] = useState('')
   const [txHash, setTxHash] = useState('')
 
-  const sharesBn = (() => {
-    try { return shares ? BigInt(Math.round(parseFloat(shares) * 1e18)) : 0n } catch { return 0n }
-  })()
+  const sharesBn = parseSharesInput(shares)
 
-  const { data: fbUsdcBal, refetch: refetchBal } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
+  const { data: yrCoreBal, refetch: refetchBal } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: enabled && !!address },
   })
   const { data: redeemsPaused } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'redeemsPaused',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'redeemsPaused',
     query: { enabled },
   })
   const { data: systemMode } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'systemMode',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'systemMode',
     query: { enabled },
   })
   const { data: preview } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'previewRedeem',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'previewRedeem',
     args: sharesBn > 0n ? [sharesBn] : undefined,
     query: { enabled: enabled && sharesBn > 0n },
   })
 
   // Free shares = total bal (for simplicity: full balance, locked amounts will revert at contract)
-  const freeBal = fbUsdcBal ?? 0n
+  const freeBal = yrCoreBal ?? 0n
 
   const { writeContractAsync } = useWriteContract()
   const isEmergency = systemMode === 2
 
   function setPct(pct: number) {
     if (!freeBal) return
-    const val = (Number(freeBal) * pct / 100) / 1e18
-    setShares(val.toFixed(6))
+    const val = freeBal * BigInt(pct) / 100n
+    setShares(formatSharesForInput(val))
     setStep('idle')
     setErrMsg('')
   }
@@ -282,7 +278,7 @@ function RedeemSection() {
     if (redeemsPaused) return 'Redeems are currently paused'
     if (isEmergency) return 'Emergency Exit active — use claimExitAssets path'
     if (!sharesBn || sharesBn <= 0n) return 'Enter a valid amount'
-    if (sharesBn > freeBal) return 'Exceeds available fbUSDC balance'
+    if (sharesBn > freeBal) return 'Exceeds available yrCORE balance'
     return null
   }
 
@@ -293,7 +289,7 @@ function RedeemSection() {
     setStep('redeeming')
     try {
       const hash = await writeContractAsync({
-        address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'redeem',
+        address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'redeem',
         args: [sharesBn, address!, address!],
       })
       setTxHash(hash)
@@ -319,7 +315,7 @@ function RedeemSection() {
 
   return (
     <div className="card">
-      <div className="card-title">Redeem fbUSDC</div>
+      <div className="card-title">Redeem yrCORE shares</div>
 
       {isEmergency && (
         <div className="signal-banner" style={{ background: '#2d0b0b', border: '1px solid #5c1010', color: 'var(--red)', marginBottom: 12 }}>
@@ -334,7 +330,7 @@ function RedeemSection() {
       )}
 
       <div className="info-row">
-        <span className="info-label">Available fbUSDC (free)</span>
+        <span className="info-label">Available yrCORE (free)</span>
         <span className="info-value">{fmtShares(freeBal)}</span>
       </div>
       <div className="note" style={{ marginBottom: 8 }}>
@@ -342,7 +338,7 @@ function RedeemSection() {
       </div>
 
       <div className="field">
-        <label>Shares to Redeem (fbUSDC)</label>
+        <label>Shares to Redeem (yrCORE)</label>
         <input
           type="number" min="0" step="0.000001"
           placeholder="0.000000"
@@ -393,8 +389,26 @@ export default function DepositRedeem() {
     <div className="page-content">
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>Deposit / Redeem</div>
-        <div className="note">Deposit USDC to receive fbUSDC shares, or redeem shares for USDC.</div>
+        <div className="note">Deposit USDC to receive yrCORE shares, or redeem yrCORE shares for USDC.</div>
       </div>
+
+      {/* ── Closed Beta Risk Notice ── */}
+      <div style={{
+        marginBottom: 16,
+        padding: '10px 14px',
+        background: '#1a1200',
+        border: '1px solid #5c3a00',
+        borderRadius: 6,
+        fontSize: 12,
+        color: 'var(--yellow)',
+        lineHeight: 1.6,
+      }}>
+        <strong>Closed Beta — Use small test amounts only.</strong>{' '}
+        YearRing is an early-stage, invite-only protocol running on Base Mainnet with real USDC.
+        It has not completed a third-party audit. Strategy yield is variable and not guaranteed.
+        No principal protection. Only deposit amounts you are comfortable losing in a worst-case scenario.
+      </div>
+
       <DepositSection />
       <RedeemSection />
     </div>

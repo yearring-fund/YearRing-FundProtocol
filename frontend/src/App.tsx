@@ -14,6 +14,7 @@ import Beneficiary from './pages/Beneficiary'
 import Governance from './pages/Governance'
 import Claim from './pages/Claim'
 import Community from './pages/Community'
+import Admin from './pages/Admin'
 
 function NetworkGuard({ children }: { children: React.ReactNode }) {
   const chainId = useChainId()
@@ -43,19 +44,19 @@ function GlobalStatusBar() {
   const enabled = isConnected && chainId === BASE_ID
 
   const { data: depositsPaused } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'depositsPaused',
     query: { enabled },
   })
   const { data: redeemsPaused } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'redeemsPaused',
     query: { enabled },
   })
   const { data: systemMode } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'systemMode',
     query: { enabled },
@@ -120,6 +121,7 @@ const NAV_ITEMS = [
   { path: '/governance',  label: 'Governance'  },
   { path: '/claim',       label: 'Claim'       },
   { path: '/community',   label: 'Community'   },
+  { path: '/admin',       label: 'Admin'       },
 ]
 
 export default function App() {
@@ -156,12 +158,14 @@ export default function App() {
 
       {/* Step 4 banner */}
       <div className="step4-banner">
-        <span style={{ fontWeight: 700 }}>STEP 4 · INVITED USER ACCESS</span>
+        <span style={{ fontWeight: 700 }}>Closed Beta</span>
+        <span>Base Mainnet</span>
+        <span>·</span>
         <span>Invite-only</span>
         <span>·</span>
-        <span>Not a public product</span>
+        <span>Early-stage</span>
         <span>·</span>
-        <span>Early-stage controlled access</span>
+        <span>Unaudited</span>
         <span style={{ marginLeft: 'auto', opacity: 0.7 }}>Base Mainnet · Chain ID 8453</span>
       </div>
 
@@ -178,6 +182,7 @@ export default function App() {
             <Route path="/governance"  element={<Governance />} />
             <Route path="/claim"       element={<Claim />} />
             <Route path="/community"   element={<Community />} />
+            <Route path="/admin"       element={<Admin />} />
           </Routes>
         </main>
       </NetworkGuard>

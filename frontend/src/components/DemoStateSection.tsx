@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useReadContract } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
 import { DEMO_PERSONAS } from '../contracts/demoPersonas'
-import { UserState_ABI, FundVault_ABI, Beneficiary_ABI, LockLedger_ABI, LockRewardManager_ABI, RewardToken_ABI } from '../contracts/abis'
-import { fmtShares, fmtAddr, fmtTs, fmtRwt, lockStateName } from '../utils'
+import { UserState_ABI, FundVault_ABI, Beneficiary_ABI, LockLedger_ABI, LockPointsRebateManager_ABI, PointsToken_ABI } from '../contracts/abis'
+import { fmtShares, fmtAddr, fmtTs, fmtPoints, lockStateName } from '../utils'
 
 const STATE_BADGE: Record<number, string> = {
   0: 'badge-gray',
@@ -18,7 +18,7 @@ function LockSummary({ lockId }: { lockId: bigint }) {
     functionName: 'getLock', args: [lockId],
   })
   const { data: rebate } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
     functionName: 'previewRebate', args: [lockId],
   })
   const p = pos as { owner: `0x${string}`; shares: bigint; unlockAt: bigint; unlocked: boolean; earlyExited: boolean } | undefined
@@ -47,11 +47,11 @@ function PersonaCard({ name, address, scenario }: PersonaCardProps) {
     functionName: 'userStateOf', args: [addr], query: { enabled },
   })
   const { data: shares } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'balanceOf', args: [addr], query: { enabled },
   })
   const { data: rwt } = useReadContract({
-    address: ADDRESSES.RewardToken, abi: RewardToken_ABI,
+    address: ADDRESSES.PointsToken, abi: PointsToken_ABI,
     functionName: 'balanceOf', args: [addr], query: { enabled },
   })
   const { data: ben } = useReadContract({
@@ -108,8 +108,8 @@ function PersonaCard({ name, address, scenario }: PersonaCardProps) {
           {lockStateName(stateNum)}
         </span>
       </div>
-      <div className="info-row"><span className="info-label">fbUSDC balance</span>   <span>{fmtShares(shares as bigint | undefined)}</span></div>
-      <div className="info-row"><span className="info-label">RWT balance</span>      <span>{fmtRwt(rwt as bigint | undefined)}</span></div>
+      <div className="info-row"><span className="info-label">yrCORE balance</span>   <span>{fmtShares(shares as bigint | undefined)}</span></div>
+      <div className="info-row"><span className="info-label">Points balance</span>      <span>{fmtPoints(rwt as bigint | undefined)}</span></div>
       <div className="info-row">
         <span className="info-label">Beneficiary</span>
         <span className="mono" style={{ fontSize: 11 }} title={benAddr}>{fmtAddr(benAddr)}</span>
@@ -132,7 +132,7 @@ function PersonaCard({ name, address, scenario }: PersonaCardProps) {
 
 const PERSONA_META = [
   { key: 'alice', name: 'Alice', scenario: 'Scene B — Gold 180d lock, LockedAccumulating' },
-  { key: 'bob',   name: 'Bob',   scenario: 'Scene A/C — fbUSDC holder, Carol\'s beneficiary' },  // TODO: re-seed demo wallets for cleaner 3-scenario split
+  { key: 'bob',   name: 'Bob',   scenario: 'Scene A/C — yrCORE holder, Carol\'s beneficiary' },  // TODO: re-seed demo wallets for cleaner 3-scenario split
   { key: 'carol', name: 'Carol', scenario: 'Scene C — Silver 90d lock, admin-marked inactive' },
 ]
 

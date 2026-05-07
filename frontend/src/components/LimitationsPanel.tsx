@@ -1,14 +1,14 @@
 export default function LimitationsPanel() {
   return (
     <>
-      {/* ── Protocol Risk & Compliance Disclosure (COMPLIANCE §7) ── */}
+      {/* ── Protocol Risk & Compliance Disclosure ── */}
       <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid var(--danger, #c00)' }}>
         <div className="card-title">Protocol Risk & Compliance Disclosure</div>
         <ul className="limitations-list">
           <li>
             <strong>This protocol is not capital-guaranteed.</strong> Depositing USDC into the vault
             does not guarantee return of principal. Strategy losses, smart contract bugs, or adverse
-            market conditions can reduce the value of your shares (fbUSDC).
+            market conditions can reduce the value of your shares (yrCORE).
           </li>
           <li>
             <strong>This protocol does not offer fixed or guaranteed returns.</strong>{' '}
@@ -16,15 +16,21 @@ export default function LimitationsPanel() {
             as increase. No yield rate is promised or implied.
           </li>
           <li>
-            <strong>RWT (Reward Token) is not part of NAV and does not constitute fund yield.</strong>{' '}
-            RWT is issued as a commitment incentive. Its market price (if any) is independent of
-            the vault's asset performance. A change in RWT price does not affect <code>pricePerShare</code>{' '}
-            and should not be treated as protocol income.
+            <strong>Points are not part of NAV and do not constitute fund yield.</strong>{' '}
+            Points are issued as a commitment incentive for closed beta participants. They are not
+            the protocol's native token. Once the native token launches, early testing rewards will
+            be distributed based on users' Points holdings at that time.
           </li>
           <li>
-            <strong>This protocol is not a security, and nothing here constitutes investment advice.</strong>{' '}
-            Participation is voluntary and at your own risk. FinancialBase does not provide
-            financial, legal, or tax advice.
+            <strong>This is a closed beta — participation is by invitation only.</strong>{' '}
+            This is an early-stage, unaudited protocol running on Base Mainnet with real USDC.
+            This is not a public token sale or public launch. FinancialBase does not provide
+            financial, legal, or tax advice. Use small test amounts only.
+          </li>
+          <li>
+            <strong>Treasury handles protocol fees, rebate reserves, and protocol income — it does not control user principal.</strong>{' '}
+            User funds are held in the vault contract (<code>YearRingCoreVaultV01</code>) and managed
+            by the strategy layer. Treasury is a separate accounting contract for fee and rebate flows.
           </li>
           <li>
             <strong>Governance votes are signal-layer only — they do not auto-execute.</strong>{' '}
@@ -40,15 +46,15 @@ export default function LimitationsPanel() {
         <div className="card-title">Governance & Permission Risk Disclosure</div>
         <ul className="limitations-list">
           <li>
-            <strong>DEFAULT_ADMIN_ROLE is held by a multisig wallet.</strong> Non-emergency protocol
-            operations (fee updates, reserve ratio changes, strategy switches) are controlled by the
-            multisig and subject to a 24-hour timelock delay via <code>ProtocolTimelockV02</code>.
+            <strong>DEFAULT_ADMIN_ROLE is held by ProtocolTimelockV02 (24h timelock).</strong> Non-emergency protocol
+            operations (fee updates, reserve ratio changes, strategy switches) must be scheduled and
+            executed via <code>ProtocolTimelockV02</code> with a 24-hour delay. No Safe/multisig is configured in
+            the current closed beta deployment.
           </li>
           <li>
             <strong>EMERGENCY_ROLE can act immediately, bypassing the timelock.</strong> This role
             exists to allow rapid response to exploits or market crises. The holder can pause deposits/redeems
-            and trigger Emergency Exit without any delay. The multisig also holds this role in the current
-            deployment.
+            and trigger Emergency Exit without any delay.
           </li>
           <li>
             <strong>Emergency Exit gives admin exclusive control over exit round timing.</strong> During
@@ -56,46 +62,33 @@ export default function LimitationsPanel() {
             round. The admin determines how much USDC is made available and when rounds open/close.
           </li>
           <li>
-            <strong>No upgrade proxy in V3.</strong> <code>FundVaultV01</code> is non-upgradeable. The{' '}
-            <code>UPGRADER_ROLE</code> constant is defined for forward compatibility only and is not
-            granted or used in this version. A contract migration would require a new deployment and
-            voluntary user migration.
+            <strong>YearRingCoreVaultV01 is non-upgradeable.</strong> A contract migration would
+            require a new deployment and voluntary user migration.
           </li>
           <li>
             <strong>Timelock delay: 24 hours minimum.</strong> Non-emergency governance operations must
-            be scheduled and then executed after a 24h waiting period. This delay can be observed
-            on-chain before execution.
+            be scheduled and then executed after a 24h waiting period.
           </li>
         </ul>
       </div>
 
       {/* ── Known Limitations ── */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="card-title">Known Limitations (V3 Testnet Demo)</div>
+        <div className="card-title">Known Limitations (Closed Beta)</div>
         <ul className="limitations-list">
           <li>
-            <strong>Maturity on testnet:</strong> Depending on tier, live maturity requires waiting
-            through the full protocol duration (30–180 days). Full lifecycle (lock → matured → unlock)
-            should be demonstrated via a local Hardhat demo with <code>evm_increaseTime</code>.
+            <strong>Maturity requires full lock duration.</strong> Depending on tier, live maturity
+            requires waiting 30–180 days. Full lifecycle (lock → matured → unlock) can be demonstrated
+            via a local Hardhat demo with <code>evm_increaseTime</code>.
           </li>
           <li>
             <strong>Beneficiary: locked positions only.</strong> <code>executeClaim</code> transfers
-            locked positions to the beneficiary. The original owner's free fbUSDC balance is{' '}
-            <strong>not</strong> transferred automatically.
+            locked positions to the beneficiary. The original owner's free yrCORE shares balance is{' '}
+            <strong>not</strong> transferred automatically — on-chain beneficiary record only.
           </li>
           <li>
             <strong>Rebate rights not inherited.</strong> When a beneficiary claims a lock,
-            the fee rebate entitlement stays with the original lock owner (not transferred to beneficiary).
-          </li>
-          <li>
-            <strong>Strategy yield is admin-simulated.</strong> DummyStrategy on testnet does not
-            automatically accrue yield. <code>pricePerShare</code> changes only when simulated
-            yield is introduced and reflected into protocol assets.
-          </li>
-          <li>
-            <strong>Admin actions not fully exposed:</strong> <code>adminMarkInactive</code> and
-            yield simulation require the admin wallet via direct contract calls or Hardhat scripts.
-            Standard admin operations (pause, accrue fee, transfer to strategy) are available in the Admin Console.
+            the fee rebate entitlement stays with the original lock owner.
           </li>
           <li>
             <strong>Heartbeat ≠ other actions.</strong> Only <code>heartbeat()</code> resets

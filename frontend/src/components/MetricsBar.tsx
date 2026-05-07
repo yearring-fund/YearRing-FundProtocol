@@ -1,6 +1,6 @@
 import { useReadContract } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
-import { Metrics_ABI, FundVault_ABI, MockUSDC_ABI } from '../contracts/abis'
+import { Metrics_ABI, FundVault_ABI, USDC_ABI } from '../contracts/abis'
 import { fmtUsdc, fmtBps, fmtPps } from '../utils'
 
 const RESERVE_FLOOR_BPS   = 1500n  // 15%
@@ -21,24 +21,24 @@ export default function MetricsBar() {
     query: { enabled: !!ADDRESSES.MetricsLayerV02 },
   })
   const { data: pps, refetch: r2 } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'pricePerShare',
-    query: { enabled: !!ADDRESSES.FundVaultV01 },
+    query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 },
   })
   const { data: totalAssets, refetch: r3 } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'totalAssets',
-    query: { enabled: !!ADDRESSES.FundVaultV01 },
+    query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 },
   })
   // Vault's own USDC balance — numerator of the actual reserve ratio
   const { data: vaultUsdcBal, refetch: r4 } = useReadContract({
     address: ADDRESSES.USDC,
-    abi: MockUSDC_ABI,
+    abi: USDC_ABI,
     functionName: 'balanceOf',
-    args: ADDRESSES.FundVaultV01 ? [ADDRESSES.FundVaultV01] : undefined,
-    query: { enabled: !!ADDRESSES.USDC && !!ADDRESSES.FundVaultV01 },
+    args: ADDRESSES.YearRingCoreVaultV01 ? [ADDRESSES.YearRingCoreVaultV01] : undefined,
+    query: { enabled: !!ADDRESSES.USDC && !!ADDRESSES.YearRingCoreVaultV01 },
   })
 
   const s = snap as { totalTVL: bigint; totalLockedShares: bigint; lockedRatioBps: bigint; totalLocksEver: bigint } | undefined

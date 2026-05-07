@@ -4,9 +4,9 @@ import { FundVault_ABI } from '../contracts/abis'
 
 export default function FeeRulesSection() {
   const { data: feeBps, refetch } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'mgmtFeeBpsPerMonth',
-    query: { enabled: !!ADDRESSES.FundVaultV01 },
+    query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 },
   })
 
   const bps        = feeBps as bigint | undefined
@@ -36,14 +36,14 @@ export default function FeeRulesSection() {
         </div>
         <div className="info-row">
           <span className="info-label">Collection Method</span>
-          <span className="info-value">Linearly accrued per second, minting fbUSDC shares to Treasury</span>
+          <span className="info-value">Linearly accrued per second, minting yrCORE shares to Treasury</span>
         </div>
         <div className="info-row">
           <span className="info-label">Settlement Trigger</span>
           <span className="info-value">Auto-settled on deposit / redeem; admin can also call Accrue Fee manually</span>
         </div>
         <p className="note" style={{ marginTop: 6 }}>
-          V2 fee rate is fixed and not user-adjustable. Rate changes must be executed by the admin via the Admin Console.
+          Closed beta fee rate: 4 bps/month. Rate changes must be executed by the admin via the Admin Console.
         </p>
       </div>
 
@@ -53,15 +53,15 @@ export default function FeeRulesSection() {
       <div className="rules-block">
         <div className="rules-block-title">Lock Discount &amp; Fee Rebate</div>
         <p className="note" style={{ marginBottom: 8 }}>
-          Locking fbUSDC entitles you to a partial management fee rebate. The discount applies to the management fee itself and is paid in fbUSDC shares.
+          Locking yrCORE shares entitles you to a partial management fee rebate. The discount applies to the management fee itself and is paid in yrCORE shares from Treasury.
         </p>
         <table className="yield-table">
           <thead>
             <tr>
               <th>Tier</th>
               <th>Lock Duration</th>
-              <th>Mgmt Fee Discount</th>
-              <th>RWT Multiplier</th>
+              <th>Mgmt Fee Rebate</th>
+              <th>Points Multiplier</th>
             </tr>
           </thead>
           <tbody>
@@ -87,12 +87,13 @@ export default function FeeRulesSection() {
         </table>
         <p className="note" style={{ marginTop: 8 }}>
           On-chain rebate formula (accrued per second):<br />
-          <code>rebate(fbUSDC) = lockedShares × (mgmtBps ÷ 10,000) × (discountBps ÷ 10,000) × (elapsedSeconds ÷ 2,592,000)</code>
+          <code>rebate(yrCORE) = lockedShares × (mgmtBps ÷ 10,000) × (discountBps ÷ 10,000) × (elapsedSeconds ÷ 2,592,000)</code>
           <br /><br />
-          Example: Bronze, 1000 fbUSDC, full 30 days →<br />
-          1000 × (9÷10000) × (2000÷10000) × 1 = <strong>0.18 fbUSDC</strong> (≈ 20% of management fee)
+          Example: Bronze, 1000 yrCORE shares, full 30 days →<br />
+          1000 × (4÷10000) × (2000÷10000) × 1 = <strong>0.08 yrCORE</strong> (≈ 20% of management fee)
           <br /><br />
-          Early exit requires returning all issued RWT; fee rebate is settled based on actual lock duration and can be claimed at any time.
+          Early exit requires returning all issued Points; management fee rebate is settled based on actual lock duration and can be claimed at any time.
+          Rebate is a protocol benefit for eligible locked users. It is not guaranteed yield and may depend on protocol rules and available fee accrual.
         </p>
       </div>
 

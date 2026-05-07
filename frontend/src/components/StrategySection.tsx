@@ -7,18 +7,18 @@ const MODE_LABELS = ['Normal', 'Paused', 'EmergencyExit']
 const MODE_BADGES = ['badge-green', 'badge-yellow', 'badge-red']
 
 export default function StrategySection() {
-  const enabled  = !!ADDRESSES.FundVaultV01
+  const enabled  = !!ADDRESSES.YearRingCoreVaultV01
 
   const { data: totalAssets, refetch: r1 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'totalAssets', query: { enabled },
   })
   const { data: smAddr, refetch: r2 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'strategyManager', query: { enabled },
   })
   const { data: vaultMode, refetch: r3 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'systemMode', query: { enabled },
   })
 
@@ -42,8 +42,11 @@ export default function StrategySection() {
 
   const stratPaused = isPaused as boolean | undefined
 
-  const tvlPct = managed !== undefined && total !== undefined && total > 0n
-    ? ((Number(managed) / Number(total)) * 100).toFixed(1) + '%'
+  const tvlPctBps = managed !== undefined && total !== undefined && total > 0n
+    ? (managed * 10000n) / total
+    : undefined
+  const tvlPct = tvlPctBps !== undefined
+    ? `${tvlPctBps / 100n}.${(tvlPctBps % 100n).toString().padStart(2, '0')}%`
     : '–'
 
   function refetch() { r1(); r2(); r3(); r4(); r5() }
@@ -55,7 +58,7 @@ export default function StrategySection() {
       {/* ── Strategy 1 ── */}
       <div style={{ marginBottom: 14 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>Strategy 1 — Aave-based Demo</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>Strategy 1 — Aave V3</span>
           <span className={`badge ${stratPaused ? 'badge-red' : 'badge-green'}`}>
             {stratPaused === undefined ? '–' : stratPaused ? 'Paused' : 'Active'}
           </span>
@@ -70,7 +73,7 @@ export default function StrategySection() {
           <span className="info-value">{tvlPct}</span>
         </div>
         <p className="note" style={{ marginTop: 6 }}>
-          Testnet: yield is simulated by the admin minting USDC to the strategy contract.
+          Strategy yield is variable and not guaranteed. Reported values may reflect strategy reporting delay.
         </p>
       </div>
 

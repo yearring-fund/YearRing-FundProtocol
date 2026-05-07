@@ -9,11 +9,11 @@ import {
   FundVault_ABI,
   LockLedger_ABI,
   LockBenefit_ABI,
-  LockRewardManager_ABI,
+  LockPointsRebateManager_ABI,
   UserState_ABI,
-  RewardToken_ABI,
+  PointsToken_ABI,
 } from '../contracts/abis'
-import { fmtShares, fmtRwt, fmtTs, shortErr, tierName, lockStateName } from '../utils'
+import { fmtShares, fmtPoints, fmtTs, shortErr, tierName, lockStateName } from '../utils'
 import { BASE_ID } from '../wagmiConfig'
 
 function TxResult({ hash, label }: { hash: string; label: string }) {
@@ -59,12 +59,12 @@ function PositionCard({ lockId }: { lockId: bigint }) {
     query: { enabled },
   })
   const { data: rebate } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI, functionName: 'previewRebate',
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI, functionName: 'previewRebate',
     args: [lockId],
     query: { enabled },
   })
-  const { data: issuedRwt } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI, functionName: 'issuedRewardTokens',
+  const { data: issuedPoints } = useReadContract({
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI, functionName: 'issuedPoints',
     args: [lockId],
     query: { enabled },
   })
@@ -74,13 +74,13 @@ function PositionCard({ lockId }: { lockId: bigint }) {
     query: { enabled },
   })
   const { data: earlyExitInfo } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI, functionName: 'checkEarlyExit',
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI, functionName: 'checkEarlyExit',
     args: [lockId],
     query: { enabled },
   })
-  const { data: rwtAllowance } = useReadContract({
-    address: ADDRESSES.RewardToken, abi: RewardToken_ABI, functionName: 'allowance',
-    args: address ? [address, ADDRESSES.LockRewardManagerV02] : undefined,
+  const { data: pointsAllowance } = useReadContract({
+    address: ADDRESSES.PointsToken, abi: PointsToken_ABI, functionName: 'allowance',
+    args: address ? [address, ADDRESSES.LockPointsRebateManagerV02] : undefined,
     query: { enabled: enabled && !!address },
   })
 
@@ -96,8 +96,8 @@ function PositionCard({ lockId }: { lockId: bigint }) {
 
   const isSettled = lock.unlocked || lock.earlyExited
   const canUnlock = !isSettled && Number(lock.unlockAt) * 1000 <= Date.now()
-  const tokensToReturn = earlyExitInfo?.[1] ?? 0n
-  const needsRwtApprove = rwtAllowance !== undefined && tokensToReturn > 0n && rwtAllowance < tokensToReturn
+  const pointsToReturn = earlyExitInfo?.[1] ?? 0n
+  const needsPointsApprove = pointsAllowance !== undefined && pointsToReturn > 0n && pointsAllowance < pointsToReturn
 
   function tierBadge(t: number | undefined) {
     const name = tierName(t)
@@ -119,7 +119,7 @@ function PositionCard({ lockId }: { lockId: bigint }) {
     setErrMsg(''); setRebaseStep('busy')
     try {
       const hash = await writeContractAsync({
-        address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
+        address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
         functionName: 'claimRebate', args: [lockId],
       })
       setRebaseTx(hash)
@@ -146,18 +146,18 @@ function PositionCard({ lockId }: { lockId: bigint }) {
   async function handleEarlyExit() {
     setErrMsg(''); setShowExitConfirm(false)
     try {
-      if (needsRwtApprove) {
+      if (needsPointsApprove) {
         setExitStep('approving')
         await writeContractAsync({
-          address: ADDRESSES.RewardToken, abi: RewardToken_ABI,
-          functionName: 'approve', args: [ADDRESSES.LockRewardManagerV02, tokensToReturn],
+          address: ADDRESSES.PointsToken, abi: PointsToken_ABI,
+          functionName: 'approve', args: [ADDRESSES.LockPointsRebateManagerV02, pointsToReturn],
         })
         await new Promise(r => setTimeout(r, 3000))
       }
       setExitStep('exiting')
       const hash = await writeContractAsync({
-        address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
-        functionName: 'earlyExitWithReturn', args: [lockId],
+        address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
+        functionName: 'earlyExit', args: [lockId],
       })
       setExitTx(hash)
       setExitStep('done')
@@ -191,8 +191,8 @@ function PositionCard({ lockId }: { lockId: bigint }) {
         <span>{fmtTs(lock.unlockAt)}</span>
       </div>
       <div className="info-row">
-        <span className="info-label">Issued RWT</span>
-        <span>{fmtRwt(issuedRwt)}</span>
+        <span className="info-label">Points issued</span>
+        <span>{fmtPoints(issuedPoints)}</span>
       </div>
       {!isSettled && (
         <div className="info-row">
@@ -204,10 +204,10 @@ function PositionCard({ lockId }: { lockId: bigint }) {
       {!isSettled && (
         <>
           {/* Early exit info */}
-          {earlyExitInfo && tokensToReturn > 0n && (
+          {earlyExitInfo && pointsToReturn > 0n && (
             <div style={{ marginTop: 8, padding: '8px 10px', background: '#2d0b0b', border: '1px solid #5c1010', borderRadius: 6 }}>
               <div className="note" style={{ color: 'var(--red)', margin: 0 }}>
-                Early exit: must return <strong>{fmtRwt(tokensToReturn)}</strong>
+                Early exit may remove the Points associated with this lock. Must return <strong>{fmtPoints(pointsToReturn)}</strong> Points
               </div>
             </div>
           )}
@@ -240,7 +240,7 @@ function PositionCard({ lockId }: { lockId: bigint }) {
                 onClick={() => setShowExitConfirm(true)}
                 disabled={exitStep === 'approving' || exitStep === 'exiting' || exitStep === 'done'}
               >
-                {exitStep === 'approving' ? 'Approving RWT…'
+                {exitStep === 'approving' ? 'Approving Points…'
                   : exitStep === 'exiting' ? 'Exiting…'
                   : exitStep === 'done' ? 'Exited ✓'
                   : 'Early Exit'}
@@ -253,12 +253,13 @@ function PositionCard({ lockId }: { lockId: bigint }) {
             <div style={{ marginTop: 10, padding: '12px', background: '#2d0b0b', border: '1px solid #5c1010', borderRadius: 6 }}>
               <div style={{ fontWeight: 600, color: 'var(--red)', marginBottom: 8 }}>Confirm Early Exit</div>
               <div className="note" style={{ color: 'var(--text)', marginBottom: 10 }}>
-                You will lose part of your rebate and must return <strong>{fmtRwt(tokensToReturn)}</strong> in RWT.
+                Early exit may remove the Points associated with this lock before returning vault shares or assets.
+                You will lose part of your rebate and must return <strong>{fmtPoints(pointsToReturn)}</strong> Points.
                 This action cannot be undone.
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn-danger" onClick={handleEarlyExit}>
-                  {needsRwtApprove ? 'Approve RWT → Exit' : 'Confirm Early Exit'}
+                  {needsPointsApprove ? '1. Approve Points → Exit' : 'Confirm Early Exit'}
                 </button>
                 <button className="btn-secondary" onClick={() => setShowExitConfirm(false)}>Cancel</button>
               </div>
@@ -317,6 +318,10 @@ export default function Positions() {
           {lockIds.map((id: bigint) => (
             <PositionCard key={id.toString()} lockId={id} />
           ))}
+          <p className="note" style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+            Rebate is a protocol benefit for eligible locked users. It is not guaranteed yield and may depend on protocol rules and available fee accrual.
+            Points are an internal closed beta accounting mechanism and are not a live tradable token.
+          </p>
         </div>
       )}
     </div>

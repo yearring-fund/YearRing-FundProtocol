@@ -1,7 +1,7 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
-import { LockLedger_ABI, LockBenefit_ABI, LockRewardManager_ABI, UserState_ABI, RewardToken_ABI } from '../contracts/abis'
-import { fmtShares, fmtTs, fmtBps, fmtRwt, shortErr, tierName, lockStateName } from '../utils'
+import { LockLedger_ABI, LockBenefit_ABI, LockPointsRebateManager_ABI, UserState_ABI, PointsToken_ABI } from '../contracts/abis'
+import { fmtShares, fmtTs, fmtBps, fmtPoints, shortErr, tierName, lockStateName } from '../utils'
 
 type LockPosition = {
   owner: string
@@ -42,24 +42,24 @@ export default function LockRow({ lockId, userAddress, onDone }: Props) {
     query: { enabled: !!position && !position?.unlocked },
   })
   const { data: rebatePreview } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
     functionName: 'previewRebate', args: [lockId],
     query: { enabled: !!position && !position?.unlocked },
   })
-  const { data: issuedRwt } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
-    functionName: 'issuedRewardTokens', args: [lockId],
+  const { data: issuedPoints } = useReadContract({
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
+    functionName: 'issuedPoints', args: [lockId],
     query: { enabled: !!position && !position?.unlocked },
   })
   const { data: earlyExitInfo } = useReadContract({
-    address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
+    address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
     functionName: 'checkEarlyExit', args: [lockId],
     query: { enabled: !!position && !position?.unlocked && !position?.earlyExited },
   })
   const earlyInfo = earlyExitInfo as {
-    tokensToReturn: bigint
-    userTokenBalance: bigint
-    userTokenAllowance: bigint
+    pointsToReturn: bigint
+    userPointsBalance: bigint
+    userPointsAllowance: bigint
   } | undefined
 
   const { writeContract, isPending, data: hash, error } = useWriteContract()
@@ -94,24 +94,24 @@ export default function LockRow({ lockId, userAddress, onDone }: Props) {
 
   function claimRebate() {
     writeContract({
-      address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
+      address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
       functionName: 'claimRebate', args: [lockId],
     })
   }
 
-  function approveRwtForEarlyExit() {
+  function approvePointsForEarlyExit() {
     if (!earlyInfo) return
     writeContract({
-      address: ADDRESSES.RewardToken, abi: RewardToken_ABI,
+      address: ADDRESSES.PointsToken, abi: PointsToken_ABI,
       functionName: 'approve',
-      args: [ADDRESSES.LockRewardManagerV02, earlyInfo.tokensToReturn],
+      args: [ADDRESSES.LockPointsRebateManagerV02, earlyInfo.pointsToReturn],
     })
   }
 
-  function earlyExit() {
+  function doEarlyExit() {
     writeContract({
-      address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI,
-      functionName: 'earlyExitWithReturn', args: [lockId],
+      address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI,
+      functionName: 'earlyExit', args: [lockId],
     })
   }
 
@@ -130,9 +130,9 @@ export default function LockRow({ lockId, userAddress, onDone }: Props) {
       <div className="info-row"><span className="info-label">Unlock at</span>     <span>{fmtTs(position.unlockAt)}</span></div>
       {isActive && (
         <>
-          <div className="info-row"><span className="info-label">Fee discount</span>  <span>{fmtBps(discountBps as bigint | undefined)}</span></div>
-          <div className="info-row"><span className="info-label">Rebate preview</span><span>{fmtShares(rebatePreview as bigint | undefined)}</span></div>
-          <div className="info-row"><span className="info-label">RWT issued</span>    <span>{fmtRwt(issuedRwt as bigint | undefined)}</span></div>
+          <div className="info-row"><span className="info-label">Fee discount</span>   <span>{fmtBps(discountBps as bigint | undefined)}</span></div>
+          <div className="info-row"><span className="info-label">Rebate preview</span> <span>{fmtShares(rebatePreview as bigint | undefined)}</span></div>
+          <div className="info-row"><span className="info-label">Points issued</span>  <span>{fmtPoints(issuedPoints as bigint | undefined)}</span></div>
         </>
       )}
 
@@ -143,11 +143,11 @@ export default function LockRow({ lockId, userAddress, onDone }: Props) {
           ) : (
             <>
               <button className="btn-green btn-sm" disabled={busy} onClick={claimRebate}>Claim Rebate</button>
-              <button className="btn-secondary btn-sm" disabled={busy} onClick={approveRwtForEarlyExit}
-                title={`Must approve ${fmtRwt(earlyInfo?.tokensToReturn)} RWT first`}>
-                1. Approve RWT
+              <button className="btn-secondary btn-sm" disabled={busy} onClick={approvePointsForEarlyExit}
+                title={`Must approve ${fmtPoints(earlyInfo?.pointsToReturn)} Points first`}>
+                1. Approve Points
               </button>
-              <button className="btn-danger btn-sm" disabled={busy} onClick={earlyExit}>2. Early Exit</button>
+              <button className="btn-danger btn-sm" disabled={busy} onClick={doEarlyExit}>2. Early Exit</button>
             </>
           )}
         </div>

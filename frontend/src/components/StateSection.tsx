@@ -22,9 +22,9 @@ export default function StateSection() {
   })
 
   const { data: totalShares, refetch: r2 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    query: { enabled: enabled && !!ADDRESSES.FundVaultV01 },
+    query: { enabled: enabled && !!ADDRESSES.YearRingCoreVaultV01 },
   })
 
   // userLockedSharesOf(address) is a confirmed view on LockLedgerV02 — sums active locked shares on-chain
@@ -63,7 +63,7 @@ export default function StateSection() {
         </span>
       </div>
 
-      <div className="info-row"><span className="info-label">Total fbUSDC</span>  <span>{fmtShares(total)}</span></div>
+      <div className="info-row"><span className="info-label">Total yrCORE</span>  <span>{fmtShares(total)}</span></div>
       <div className="info-row"><span className="info-label">Locked shares</span> <span>{fmtShares(locked)}</span></div>
       <div className="info-row"><span className="info-label">Free shares</span>   <span>{fmtShares(free)}</span></div>
       <button className="btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={refetch}>↻ Refresh</button>
@@ -74,7 +74,7 @@ export default function StateSection() {
         <strong>Normal</strong> — no active lock.<br />
         <strong>Locked (Accumulating)</strong> — lock live, rebate accruing.<br />
         <strong>Matured</strong> — past unlockAt, ready to unlock via Lock section.<br />
-        <strong>Early Exited</strong> — exited before maturity; RWT was returned.
+        <strong>Early Exited</strong> — exited before maturity; Points were deducted.
       </p>
     </div>
   )

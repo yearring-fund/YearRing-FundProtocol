@@ -1,7 +1,8 @@
+import { formatUnits } from 'viem'
 import { useAccount, useReadContract, useReadContracts } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
-import { FundVault_ABI, LockLedger_ABI, LockRewardManager_ABI, LockBenefit_ABI } from '../contracts/abis'
-import { fmtUsdc, fmtShares, fmtBps } from '../utils'
+import { FundVault_ABI, LockLedger_ABI, LockPointsRebateManager_ABI, LockBenefit_ABI } from '../contracts/abis'
+import { fmtUsdc, fmtShares, fmtPps, fmtBps } from '../utils'
 
 // ─── Mock NAV Sparkline ───────────────────────────────────────────────────────
 
@@ -11,7 +12,7 @@ function NavSparkline({ pps }: { pps: bigint | undefined }) {
   const H           = 70
   const DAILY_RATE  = 9 / 10_000 / 30   // 9 bps/month ÷ 30 days
 
-  const currentNav = pps ? Number(pps) / 1e6 : 1.0
+  const currentNav = pps ? parseFloat(formatUnits(pps as bigint, 6)) : 1.0
 
   // Reconstruct 30-day history: work backwards from current NAV
   const points = Array.from({ length: DAYS }, (_, i) => {
@@ -39,7 +40,7 @@ function NavSparkline({ pps }: { pps: bigint | undefined }) {
     <div className="sparkline-wrap">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>30-Day NAV Trend</span>
-        <span className="demo-tag">Demo Data</span>
+        <span className="demo-tag">Simulated data</span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H }} preserveAspectRatio="none">
         <defs>
@@ -87,7 +88,7 @@ function DailyYieldTable({ currentValueUsdc }: { currentValueUsdc: number }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>Last 7-Day Yield Breakdown</span>
-        <span className="demo-tag">Demo Data</span>
+        <span className="demo-tag">Simulated data</span>
       </div>
       <table className="yield-table">
         <thead>
@@ -113,21 +114,21 @@ function DailyYieldTable({ currentValueUsdc }: { currentValueUsdc: number }) {
 
 export default function YieldSection() {
   const { address } = useAccount()
-  const vaultOk     = !!address && !!ADDRESSES.FundVaultV01
+  const vaultOk     = !!address && !!ADDRESSES.YearRingCoreVaultV01
 
   const { data: shares, refetch: r1 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: vaultOk },
   })
   const { data: pps, refetch: r2 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'pricePerShare',
-    query: { enabled: !!ADDRESSES.FundVaultV01 },
+    query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 },
   })
   const { data: currentValue, refetch: r3 } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'convertToAssets',
     args: shares ? [shares as bigint] : undefined,
     query: { enabled: vaultOk && !!shares },
@@ -145,8 +146,8 @@ export default function YieldSection() {
   // Batch: previewRebate for all locks
   const { data: rebateResults } = useReadContracts({
     contracts: ids.map(id => ({
-      address: ADDRESSES.LockRewardManagerV02,
-      abi: LockRewardManager_ABI,
+      address: ADDRESSES.LockPointsRebateManagerV02,
+      abi: LockPointsRebateManager_ABI,
       functionName: 'previewRebate' as const,
       args: [id] as const,
     })),
@@ -186,7 +187,7 @@ export default function YieldSection() {
     ? rebateResults.reduce((sum, r) => sum + ((r.result as bigint | undefined) ?? 0n), 0n)
     : undefined
 
-  // Best (max) fee discount across active locks
+  // Best (max) fee rebate rate across active locks
   const bestDiscount = discountResults
     ? discountResults.reduce((max, r) => {
         const v = (r.result as bigint | undefined) ?? 0n
@@ -194,7 +195,7 @@ export default function YieldSection() {
       }, 0n)
     : undefined
 
-  const currentValueNum = currentVal ? Number(currentVal) / 1e6 : 0
+  const currentValueNum = currentVal ? parseFloat(formatUnits(currentVal as bigint, 6)) : 0
 
   if (!address) {
     return (
@@ -220,7 +221,7 @@ export default function YieldSection() {
       </div>
       <div className="info-row">
         <span className="info-label">Current NAV Price</span>
-        <span className="info-value">{ppsVal ? (Number(ppsVal) / 1e6).toFixed(6) + ' USDC/share' : '–'}</span>
+        <span className="info-value">{fmtPps(ppsVal)}</span>
       </div>
       <div className="info-row">
         <span className="info-label">Cost Basis (initial PPS=1)</span>
@@ -239,7 +240,7 @@ export default function YieldSection() {
 
       {/* ── Management Fee Rebate ── */}
       <div className="info-row">
-        <span className="info-label">Mgmt Fee Discount (best tier)</span>
+        <span className="info-label">Mgmt Fee Rebate (best tier)</span>
         <span className="info-value">
           {bestDiscount === undefined || bestDiscount === 0n
             ? <span style={{ color: 'var(--muted)' }}>None (no active lock)</span>
@@ -252,7 +253,10 @@ export default function YieldSection() {
           {totalRebate === undefined ? '–' : fmtShares(totalRebate)}
         </span>
       </div>
-      <p className="note">Fee rebates are paid in fbUSDC shares from Treasury and can be claimed per-lock in the Lock section.</p>
+      <p className="note">
+        Fee rebates are paid in yrCORE shares from Treasury and can be claimed per-lock in the Lock section.
+        Rebate is a protocol benefit for eligible locked users. It is not guaranteed yield and may depend on protocol rules and available fee accrual.
+      </p>
 
       <button className="btn-secondary btn-sm" style={{ marginTop: 8 }} onClick={refetch}>
         ↻ Refresh

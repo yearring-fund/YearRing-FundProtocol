@@ -1,25 +1,57 @@
-export const D6 = (n: number) => BigInt(Math.round(n * 1e6))
+import { parseUnits, formatUnits } from 'viem'
+
+/**
+ * Parse a user-entered decimal string into a bigint with the given decimals.
+ * Uses viem parseUnits — exact string-based conversion, no float arithmetic.
+ * Returns 0n on empty or invalid input.
+ */
+export function parseBigIntInput(value: string, decimals: number): bigint {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed === '.' || trimmed === '-') return 0n
+  try {
+    return parseUnits(trimmed, decimals)
+  } catch {
+    return 0n
+  }
+}
+
+export const parseSharesInput = (v: string) => parseBigIntInput(v, 18)
+export const parseUsdcInput   = (v: string) => parseBigIntInput(v, 6)
+
+/**
+ * Format a bigint (18 decimals) back to a display string for input fields.
+ * Used when computing percentage fills from on-chain balances.
+ */
+export const formatSharesForInput = (n: bigint) => formatUnits(n, 18)
+
+// ---------------------------------------------------------------------------
+// Legacy helpers — kept for display-only callers outside of this module.
+// Do NOT use for building on-chain calldata.
+// ---------------------------------------------------------------------------
+/** @deprecated Use parseUsdcInput instead for on-chain amounts */
+export const D6  = (n: number) => BigInt(Math.round(n * 1e6))
+/** @deprecated Use parseSharesInput instead for on-chain amounts */
 export const D18 = (n: number) => BigInt(Math.round(n * 1e18))
 
 export function fmtUsdc(n: bigint | undefined): string {
   if (n === undefined) return '–'
-  return (Number(n) / 1e6).toFixed(2) + ' USDC'
+  return parseFloat(formatUnits(n, 6)).toFixed(2) + ' USDC'
 }
 
 export function fmtShares(n: bigint | undefined): string {
   if (n === undefined) return '–'
-  return (Number(n) / 1e18).toFixed(6) + ' fbUSDC'
+  return parseFloat(formatUnits(n, 18)).toFixed(6) + ' yrCORE'
 }
 
-export function fmtRwt(n: bigint | undefined): string {
+export function fmtPoints(n: bigint | undefined): string {
   if (n === undefined) return '–'
-  return (Number(n) / 1e18).toFixed(4) + ' RWT'
+  return parseFloat(formatUnits(n, 18)).toFixed(4) + ' Points'
 }
 
 export function fmtPps(n: bigint | undefined): string {
   if (n === undefined) return '–'
   // pricePerShare() returns convertToAssets(1e18 shares) in USDC (6 dec)
-  return (Number(n) / 1e6).toFixed(6) + ' USDC/share'
+  return parseFloat(formatUnits(n, 6)).toFixed(6) + ' USDC/share'
 }
 
 export function fmtBps(n: bigint | undefined): string {

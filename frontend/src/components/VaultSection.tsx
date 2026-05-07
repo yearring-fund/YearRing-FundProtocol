@@ -2,40 +2,54 @@ import { useState, useEffect, useRef } from 'react'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits, formatUnits } from 'viem'
 import { ADDRESSES } from '../contracts/addresses'
-import { MockUSDC_ABI, FundVault_ABI } from '../contracts/abis'
+import { USDC_ABI, FundVault_ABI } from '../contracts/abis'
 import { fmtUsdc, fmtShares, fmtPps, shortErr } from '../utils'
 
-type OpType = 'mint' | 'approve' | 'deposit' | 'redeem' | 'claim' | null
+type OpType = 'approve' | 'deposit' | 'redeem' | 'claim' | null
 
 const SYSTEM_MODE_LABELS = ['Normal', 'Paused', 'EmergencyExit']
 const SYSTEM_MODE_BADGES = ['badge-green', 'badge-yellow', 'badge-red']
 
 function useVaultReads(address: `0x${string}` | undefined) {
-  const vaultOk = !!address && !!ADDRESSES.FundVaultV01
-  const { data: usdcBal,       refetch: r1 } = useReadContract({ address: ADDRESSES.USDC,         abi: MockUSDC_ABI,  functionName: 'balanceOf',    args: address ? [address] : undefined, query: { enabled: !!address && !!ADDRESSES.USDC } })
-  const { data: sharesBal,     refetch: r2 } = useReadContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',    args: address ? [address] : undefined, query: { enabled: vaultOk } })
-  const { data: totalAssets,   refetch: r3 } = useReadContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'totalAssets',  query: { enabled: !!ADDRESSES.FundVaultV01 } })
-  const { data: pps,           refetch: r4 } = useReadContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'pricePerShare', query: { enabled: !!ADDRESSES.FundVaultV01 } })
-  const { data: usdcAllowance, refetch: r5 } = useReadContract({ address: ADDRESSES.USDC, abi: MockUSDC_ABI, functionName: 'allowance', args: address ? [address, ADDRESSES.FundVaultV01] : undefined, query: { enabled: !!address && !!ADDRESSES.USDC && !!ADDRESSES.FundVaultV01 } })
-  const { data: systemMode,    refetch: r6 } = useReadContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'systemMode',   query: { enabled: !!ADDRESSES.FundVaultV01 } })
-  const { data: currentRoundId, refetch: r7 } = useReadContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'currentRoundId', query: { enabled: !!ADDRESSES.FundVaultV01 } })
-  const { data: userAllowed,   refetch: r8 } = useReadContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'isAllowed', args: address ? [address] : undefined, query: { enabled: vaultOk } })
+  const vaultOk = !!address && !!ADDRESSES.YearRingCoreVaultV01
+  const { data: usdcBal,       refetch: r1 } = useReadContract({ address: ADDRESSES.USDC,         abi: USDC_ABI,  functionName: 'balanceOf',    args: address ? [address] : undefined, query: { enabled: !!address && !!ADDRESSES.USDC } })
+  const { data: sharesBal,     refetch: r2 } = useReadContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',    args: address ? [address] : undefined, query: { enabled: vaultOk } })
+  const { data: totalAssets,   refetch: r3 } = useReadContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'totalAssets',  query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 } })
+  const { data: pps,           refetch: r4 } = useReadContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'pricePerShare', query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 } })
+  const { data: usdcAllowance, refetch: r5 } = useReadContract({ address: ADDRESSES.USDC, abi: USDC_ABI, functionName: 'allowance', args: address ? [address, ADDRESSES.YearRingCoreVaultV01] : undefined, query: { enabled: !!address && !!ADDRESSES.USDC && !!ADDRESSES.YearRingCoreVaultV01 } })
+  const { data: systemMode,    refetch: r6 } = useReadContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'systemMode',   query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 } })
+  const { data: currentRoundId, refetch: r7 } = useReadContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'currentRoundId', query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 } })
+  const { data: userAllowed,   refetch: r8 } = useReadContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'isAllowed', args: address ? [address] : undefined, query: { enabled: vaultOk } })
+  const sharesBig = sharesBal as bigint | undefined
+  const { data: convertedAssets, refetch: r9 } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
+    functionName: 'convertToAssets',
+    args: sharesBig !== undefined ? [sharesBig] : undefined,
+    query: { enabled: vaultOk && sharesBig !== undefined },
+  })
+  const { data: totalSupply, refetch: r10 } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
+    functionName: 'totalSupply',
+    query: { enabled: !!ADDRESSES.YearRingCoreVaultV01 },
+  })
   return {
-    usdcBal:       usdcBal       as bigint | undefined,
-    sharesBal:     sharesBal     as bigint | undefined,
-    totalAssets:   totalAssets   as bigint | undefined,
-    pps:           pps           as bigint | undefined,
-    usdcAllowance: usdcAllowance as bigint | undefined,
-    systemMode:    systemMode    as number | undefined,
-    currentRoundId: currentRoundId as bigint | undefined,
-    userAllowed:   userAllowed   as boolean | undefined,
-    refetch: () => { r1(); r2(); r3(); r4(); r5(); r6(); r7(); r8() },
+    usdcBal:         usdcBal         as bigint | undefined,
+    sharesBal:       sharesBal       as bigint | undefined,
+    totalAssets:     totalAssets     as bigint | undefined,
+    pps:             pps             as bigint | undefined,
+    usdcAllowance:   usdcAllowance   as bigint | undefined,
+    systemMode:      systemMode      as number | undefined,
+    currentRoundId:  currentRoundId  as bigint | undefined,
+    userAllowed:     userAllowed     as boolean | undefined,
+    convertedAssets: convertedAssets as bigint | undefined,
+    totalSupply:     totalSupply     as bigint | undefined,
+    refetch: () => { r1(); r2(); r3(); r4(); r5(); r6(); r7(); r8(); r9(); r10() },
   }
 }
 
 export default function VaultSection() {
   const { address } = useAccount()
-  const { usdcBal, sharesBal, totalAssets, pps, usdcAllowance, systemMode, currentRoundId, userAllowed, refetch } = useVaultReads(address)
+  const { usdcBal, sharesBal, totalAssets, pps, usdcAllowance, systemMode, currentRoundId, userAllowed, convertedAssets, totalSupply, refetch } = useVaultReads(address)
 
   const modeNum      = systemMode !== undefined ? Number(systemMode) : undefined
   const isExit       = modeNum === 2
@@ -44,15 +58,15 @@ export default function VaultSection() {
   const notAllowed   = userAllowed === false
 
   // Exit round data — read only when in EmergencyExit and a round exists
-  const roundEnabled = isExit && !!ADDRESSES.FundVaultV01 && roundId !== undefined && roundId > 0n
+  const roundEnabled = isExit && !!ADDRESSES.YearRingCoreVaultV01 && roundId !== undefined && roundId > 0n
   const { data: currentRound, refetch: refetchRound } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'exitRounds',
     args: roundId !== undefined ? [roundId] : undefined,
     query: { enabled: roundEnabled },
   })
   const { data: alreadyClaimed, refetch: refetchClaimed } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI,
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI,
     functionName: 'roundSharesClaimed',
     args: roundId !== undefined && address ? [roundId, address] : undefined,
     query: { enabled: roundEnabled && !!address },
@@ -64,7 +78,6 @@ export default function VaultSection() {
   const roundSupply  = roundData ? roundData[1] : undefined
   const alrClaimed   = alreadyClaimed as bigint | undefined
 
-  const [mintAmt,    setMintAmt]    = useState('')
   const [depositAmt, setDepositAmt] = useState('')
   const [redeemAmt,  setRedeemAmt]  = useState('')
   const [claimAmt,   setClaimAmt]   = useState('')
@@ -79,14 +92,13 @@ export default function VaultSection() {
     if (isSuccess && hash && hash !== prevHash.current) {
       prevHash.current = hash
       refetch(); refetchRound(); refetchClaimed()
-      if (opType === 'mint')    setMintAmt('')
       if (opType === 'deposit') setDepositAmt('')
       if (opType === 'redeem')  setRedeemAmt('')
       if (opType === 'claim')   setClaimAmt('')
     }
   }, [isSuccess, hash])
 
-  const configOk         = !!ADDRESSES.USDC && !!ADDRESSES.FundVaultV01
+  const configOk         = !!ADDRESSES.USDC && !!ADDRESSES.YearRingCoreVaultV01
   const depositAmountBig = depositAmt ? parseUnits(depositAmt, 6) : 0n
   const needsApprove     = !usdcAllowance || usdcAllowance < depositAmountBig
 
@@ -101,37 +113,31 @@ export default function VaultSection() {
       ? (claimAmtBig * roundAvail) / roundSupply
       : undefined
 
-  function mint() {
-    if (!address || !mintAmt) return
-    setOpType('mint')
-    writeContract({ address: ADDRESSES.USDC, abi: MockUSDC_ABI, functionName: 'mint', args: [address, parseUnits(mintAmt, 6)] })
-  }
-
   function depositOrApprove() {
     if (!address || !depositAmt) return
     if (needsApprove) {
       setOpType('approve')
-      writeContract({ address: ADDRESSES.USDC, abi: MockUSDC_ABI, functionName: 'approve', args: [ADDRESSES.FundVaultV01, depositAmountBig] })
+      writeContract({ address: ADDRESSES.USDC, abi: USDC_ABI, functionName: 'approve', args: [ADDRESSES.YearRingCoreVaultV01, depositAmountBig] })
     } else {
       setOpType('deposit')
-      writeContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'deposit', args: [depositAmountBig, address] })
+      writeContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'deposit', args: [depositAmountBig, address] })
     }
   }
 
   function redeem() {
     if (!address || !redeemAmt) return
     setOpType('redeem')
-    writeContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'redeem', args: [parseUnits(redeemAmt, 18), address, address] })
+    writeContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'redeem', args: [parseUnits(redeemAmt, 18), address, address] })
   }
 
   function claimExit() {
     if (!address || !claimAmt || roundId === undefined) return
     setOpType('claim')
-    writeContract({ address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'claimExitAssets', args: [roundId, claimAmtBig] })
+    writeContract({ address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'claimExitAssets', args: [roundId, claimAmtBig] })
   }
 
   const pendingLabel: Record<NonNullable<OpType>, string> = {
-    mint: 'Minting…', approve: 'Approving USDC…', deposit: 'Depositing…', redeem: 'Redeeming…', claim: 'Claiming…',
+    approve: 'Approving USDC…', deposit: 'Depositing…', redeem: 'Redeeming…', claim: 'Claiming…',
   }
 
   const modeLabel = modeNum !== undefined ? (SYSTEM_MODE_LABELS[modeNum] ?? '–') : '–'
@@ -157,31 +163,28 @@ export default function VaultSection() {
         </div>
       )}
 
-      <div className="info-row"><span className="info-label">Your USDC</span>    <span className="info-value">{fmtUsdc(usdcBal)}</span></div>
-      <div className="info-row"><span className="info-label">Your fbUSDC</span>  <span className="info-value">{fmtShares(sharesBal)}</span></div>
-      <div className="info-row"><span className="info-label">Total Assets</span> <span className="info-value">{fmtUsdc(totalAssets)}</span></div>
-      <div className="info-row"><span className="info-label">Price/Share</span>  <span className="info-value">{fmtPps(pps)}</span></div>
-      <button className="btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={refetch}>↻ Refresh</button>
-
-      <hr className="divider" />
-
-      {/* ── Mint ── */}
-      <div className="field">
-        <label>Mint MockUSDC</label>
-        <input type="number" placeholder="e.g. 1000" value={mintAmt} onChange={e => setMintAmt(e.target.value)} />
+      <div className="info-row"><span className="info-label">Your USDC</span>           <span className="info-value">{fmtUsdc(usdcBal)}</span></div>
+      <div className="info-row"><span className="info-label">Your yrCORE shares</span>   <span className="info-value">{fmtShares(sharesBal)}</span></div>
+      <div className="info-row">
+        <span className="info-label">Estimated Asset Value</span>
+        <span className="info-value">{fmtUsdc(convertedAssets)}</span>
       </div>
-      <div className="btn-row">
-        <button className="btn-secondary" disabled={busy || !address || !configOk || !mintAmt} onClick={mint}>
-          {busy && opType === 'mint' ? 'Minting…' : 'Mint USDC'}
-        </button>
-      </div>
-      <p className="note">This demo uses publicly mintable MockUSDC on Base Sepolia — no faucet or role needed.</p>
+      <p className="note" style={{ marginTop: 2, marginBottom: 8 }}>
+        Calculated via <code>convertToAssets(userShares)</code> — reflects current vault NAV. May not include pending fee accruals.
+      </p>
+      <div className="info-row"><span className="info-label">Total Vault Assets</span>  <span className="info-value">{fmtUsdc(totalAssets)}</span></div>
+      <div className="info-row"><span className="info-label">Total Share Supply</span>  <span className="info-value">{fmtShares(totalSupply)}</span></div>
+      <div className="info-row"><span className="info-label">Price/Share (NAV)</span>   <span className="info-value">{fmtPps(pps)}</span></div>
+      <p className="note" style={{ marginTop: 2, marginBottom: 8 }}>
+        PPS may reflect strategy reporting delay.
+      </p>
+      <button className="btn-secondary btn-sm" style={{ marginTop: 2 }} onClick={refetch}>↻ Refresh</button>
 
       <hr className="divider" />
 
       {/* ── Deposit — disabled in EmergencyExit or if not allowlisted ── */}
       <div className="field">
-        <label>Deposit USDC → fbUSDC</label>
+        <label>Deposit USDC → yrCORE shares</label>
         <input type="number" placeholder="e.g. 100" value={depositAmt} onChange={e => setDepositAmt(e.target.value)} disabled={isExit || notAllowed} />
       </div>
       {isExit && (
@@ -216,11 +219,11 @@ export default function VaultSection() {
 
       {/* ── Redeem — disabled in EmergencyExit, shows alternative hint ── */}
       <div className="field">
-        <label>Redeem fbUSDC → USDC</label>
+        <label>Redeem yrCORE shares → USDC</label>
         <div style={{ display: 'flex', gap: 6 }}>
           <input
             type="number"
-            placeholder="fbUSDC amount (e.g. 100)"
+            placeholder="yrCORE shares amount (e.g. 100)"
             value={redeemAmt}
             onChange={e => setRedeemAmt(e.target.value)}
             style={{ flex: 1 }}
@@ -248,7 +251,7 @@ export default function VaultSection() {
       {!isExit && (
         <p className="note">
           Deposit button auto-switches: shows <em>Approve USDC</em> when allowance is insufficient,
-          then <em>Deposit</em> once approved. Redeem burns fbUSDC and returns USDC at current price.
+          then <em>Deposit</em> once approved. Redeem burns yrCORE shares and returns USDC at current price.
         </p>
       )}
 
@@ -280,7 +283,7 @@ export default function VaultSection() {
               {alrClaimed !== undefined && (
                 <div className="info-row">
                   <span className="info-label">Your Claimed</span>
-                  <span className="info-value">{fmtShares(alrClaimed)} fbUSDC</span>
+                  <span className="info-value">{fmtShares(alrClaimed)} yrCORE</span>
                 </div>
               )}
             </>
@@ -292,7 +295,7 @@ export default function VaultSection() {
           {roundIsOpen && (
             <>
               <div className="field" style={{ marginTop: 10 }}>
-                <label>fbUSDC to burn (claim pro-rata USDC)</label>
+                <label>yrCORE shares to burn (claim pro-rata USDC)</label>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input
                     type="number"
@@ -325,7 +328,7 @@ export default function VaultSection() {
                 </button>
               </div>
               <p className="note" style={{ marginTop: 6 }}>
-                Claiming burns your fbUSDC and returns USDC pro-rata based on round snapshot. No approval needed.
+                Claiming burns your yrCORE shares and returns USDC pro-rata based on round snapshot. No approval needed.
               </p>
             </>
           )}

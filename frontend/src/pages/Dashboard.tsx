@@ -5,18 +5,15 @@ import {
   FundVault_ABI,
   Metrics_ABI,
   UserState_ABI,
-  RewardToken_ABI,
+  PointsToken_ABI,
   Governance_ABI,
   ClaimLedger_ABI,
+  USDC_ABI,
 } from '../contracts/abis'
 import {
-  fmtUsdc, fmtShares, fmtRwt, fmtPps, fmtBps,
+  fmtUsdc, fmtShares, fmtPoints, fmtPps, fmtBps,
 } from '../utils'
 import { BASE_ID } from '../wagmiConfig'
-
-const USDC_ABI = [
-  { name: 'balanceOf', type: 'function', inputs: [{ name: 'account', type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
-] as const
 
 function userStateName(s: number | undefined): string {
   if (s === undefined) return '–'
@@ -48,25 +45,25 @@ export default function Dashboard() {
     query: { enabled },
   })
   const { data: pps } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'pricePerShare',
     query: { enabled },
   })
   const { data: systemMode } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'systemMode',
     query: { enabled },
   })
   const { data: depositsPaused } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'depositsPaused',
     query: { enabled },
   })
   const { data: redeemsPaused } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'redeemsPaused',
     query: { enabled },
@@ -80,22 +77,36 @@ export default function Dashboard() {
     args: address ? [address] : undefined,
     query: { enabled: enabled && !!address },
   })
-  const { data: fbUsdcBal } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+  const { data: yrCoreBal } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: enabled && !!address },
   })
-  const { data: rwtBal } = useReadContract({
-    address: ADDRESSES.RewardToken,
-    abi: RewardToken_ABI,
+  const { data: pointsBal } = useReadContract({
+    address: ADDRESSES.PointsToken,
+    abi: PointsToken_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: enabled && !!address },
   })
+  const yrCoreBig = yrCoreBal as bigint | undefined
+  const { data: convertedAssets } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01,
+    abi: FundVault_ABI,
+    functionName: 'convertToAssets',
+    args: yrCoreBig !== undefined ? [yrCoreBig] : undefined,
+    query: { enabled: enabled && yrCoreBig !== undefined },
+  })
+  const { data: totalSupply } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01,
+    abi: FundVault_ABI,
+    functionName: 'totalSupply',
+    query: { enabled },
+  })
   const { data: isAllowed } = useReadContract({
-    address: ADDRESSES.FundVaultV01,
+    address: ADDRESSES.YearRingCoreVaultV01,
     abi: FundVault_ABI,
     functionName: 'isAllowed',
     args: address ? [address] : undefined,
@@ -111,9 +122,9 @@ export default function Dashboard() {
 
   // Locked shares from MetricsLayer
   const lockedShares = snapshot?.totalLockedShares ?? 0n
-  const freeShares = fbUsdcBal !== undefined && fbUsdcBal > lockedShares
-    ? fbUsdcBal - lockedShares
-    : fbUsdcBal ?? 0n
+  const freeShares = yrCoreBal !== undefined && yrCoreBal > lockedShares
+    ? yrCoreBal - lockedShares
+    : yrCoreBal ?? 0n
 
   // Claims count
   const { data: claimIds } = useReadContract({
@@ -162,8 +173,12 @@ export default function Dashboard() {
           <span className="info-value">{fmtUsdc(snapshot?.totalTVL)}</span>
         </div>
         <div className="info-row">
-          <span className="info-label">Price Per Share</span>
-          <span className="info-value">{fmtPps(pps)} <span className="note" style={{ display: 'inline', margin: 0 }}>(current estimate)</span></span>
+          <span className="info-label">Total Share Supply</span>
+          <span className="info-value">{fmtShares(totalSupply as bigint | undefined)}</span>
+        </div>
+        <div className="info-row">
+          <span className="info-label">Price Per Share (NAV)</span>
+          <span className="info-value">{fmtPps(pps)} <span className="note" style={{ display: 'inline', margin: 0 }}>(current estimate — may reflect strategy reporting delay)</span></span>
         </div>
         <div className="info-row">
           <span className="info-label">Lock Ratio</span>
@@ -218,20 +233,24 @@ export default function Dashboard() {
           <span className="info-value">{fmtUsdc(usdcBal)}</span>
         </div>
         <div className="info-row">
-          <span className="info-label">fbUSDC (Total)</span>
-          <span className="info-value">{fmtShares(fbUsdcBal)}</span>
+          <span className="info-label">yrCORE (Total)</span>
+          <span className="info-value">{fmtShares(yrCoreBal)}</span>
         </div>
         <div className="info-row">
-          <span className="info-label">fbUSDC (Free)</span>
+          <span className="info-label">Estimated Asset Value</span>
+          <span className="info-value" style={{ color: 'var(--green)' }}>{fmtUsdc(convertedAssets as bigint | undefined)}</span>
+        </div>
+        <div className="info-row">
+          <span className="info-label">yrCORE (Free)</span>
           <span className="info-value">{fmtShares(freeShares)}</span>
         </div>
         <div className="info-row">
-          <span className="info-label">fbUSDC (Locked)</span>
+          <span className="info-label">yrCORE (Locked)</span>
           <span className="info-value">{fmtShares(lockedShares)}</span>
         </div>
         <div className="info-row">
-          <span className="info-label">RWT Balance</span>
-          <span className="info-value">{fmtRwt(rwtBal)}</span>
+          <span className="info-label">Points Balance</span>
+          <span className="info-value">{fmtPoints(pointsBal)}</span>
         </div>
         <hr className="divider" />
         <div className="info-row">
@@ -264,8 +283,10 @@ export default function Dashboard() {
       </div>
 
       <div className="note" style={{ marginTop: 16 }}>
-        YearRing Fund is an invite-only, early-stage protocol. No yield is guaranteed.
-        Price per share is a current estimate based on on-chain data and may not reflect pending accruals.
+        YearRing Fund is an invite-only, early-stage, unaudited protocol running on Base Mainnet with real USDC.
+        Strategy yield is variable and not guaranteed. No principal protection.
+        Price per share is a current estimate and may not reflect pending fee accruals or strategy reporting delay.
+        Use small test amounts only.
       </div>
     </div>
   )

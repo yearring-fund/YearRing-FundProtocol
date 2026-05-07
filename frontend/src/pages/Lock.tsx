@@ -5,10 +5,11 @@ import {
   useWriteContract,
 } from 'wagmi'
 import { ADDRESSES } from '../contracts/addresses'
-import { FundVault_ABI, LockLedger_ABI, LockRewardManager_ABI } from '../contracts/abis'
+import { FundVault_ABI, LockLedger_ABI, LockPointsRebateManager_ABI } from '../contracts/abis'
 import {
-  fmtShares, fmtRwt, fmtUsdc, shortErr,
+  fmtShares, fmtPoints, fmtUsdc, shortErr,
   DURATION_30D, DURATION_90D, DURATION_180D,
+  parseSharesInput,
 } from '../utils'
 import { BASE_ID } from '../wagmiConfig'
 
@@ -18,6 +19,10 @@ const TIERS = [
   { label: 'Silver', duration: DURATION_90D,  days: 90,  multiplierBps: 13000, discountLabel: '40%', discountBps: 4000 },
   { label: 'Gold',   duration: DURATION_180D, days: 180, multiplierBps: 18000, discountLabel: '60%', discountBps: 6000 },
 ]
+
+// Points formula constant: USDC 6-dec × 1e12 × days × multiplierBps / (10000 × 500)
+const POINTS_DENOMINATOR = 5_000_000n
+const USDC_TO_POINTS_SCALE = 1_000_000_000_000n
 
 type LockStep = 'idle' | 'approving' | 'approve-wait' | 'locking' | 'lock-wait' | 'done' | 'error'
 
@@ -49,18 +54,16 @@ export default function Lock() {
   const [txHashLock, setTxHashLock] = useState('')
 
   const tier = TIERS[tierIdx]
-  const sharesBn = (() => {
-    try { return sharesInput ? BigInt(Math.round(parseFloat(sharesInput) * 1e18)) : 0n } catch { return 0n }
-  })()
+  const sharesBn = parseSharesInput(sharesInput)
 
-  const { data: fbBal } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
+  const { data: yrCoreBal } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: enabled && !!address },
   })
-  const { data: fbAllowance } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'allowance',
-    args: address ? [address, ADDRESSES.LockRewardManagerV02] : undefined,
+  const { data: yrCoreAllowance } = useReadContract({
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'allowance',
+    args: address ? [address, ADDRESSES.LockPointsRebateManagerV02] : undefined,
     query: { enabled: enabled && !!address },
   })
   const { data: activeLockCount } = useReadContract({
@@ -69,14 +72,14 @@ export default function Lock() {
     query: { enabled: enabled && !!address },
   })
   const { data: usdcValue } = useReadContract({
-    address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'convertToAssets',
+    address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'convertToAssets',
     args: sharesBn > 0n ? [sharesBn] : undefined,
     query: { enabled: enabled && sharesBn > 0n },
   })
 
-  // Preview RWT: usdcValue * 1_000_000_000_000n * durationDays * multiplierBps / (10000n * 50n)
-  const previewRwt = usdcValue && usdcValue > 0n
-    ? usdcValue * 1_000_000_000_000n * BigInt(tier.days) * BigInt(tier.multiplierBps) / (10000n * 50n)
+  // Preview Points: usdcValue(6dec) × 1e12 × durationDays × multiplierBps / (10000 × 500)
+  const previewPoints = usdcValue && usdcValue > 0n
+    ? usdcValue * USDC_TO_POINTS_SCALE * BigInt(tier.days) * BigInt(tier.multiplierBps) / (POINTS_DENOMINATOR * 10000n)
     : 0n
 
   const unlockDate = sharesBn > 0n
@@ -85,12 +88,12 @@ export default function Lock() {
 
   const { writeContractAsync } = useWriteContract()
 
-  const needsApprove = fbAllowance !== undefined && sharesBn > 0n && fbAllowance < sharesBn
+  const needsApprove = yrCoreAllowance !== undefined && sharesBn > 0n && yrCoreAllowance < sharesBn
 
   function validate(): string | null {
     if (!isConnected) return 'Connect wallet first'
     if (!sharesBn || sharesBn <= 0n) return 'Enter a valid share amount'
-    if (fbBal !== undefined && sharesBn > fbBal) return 'Exceeds available fbUSDC balance'
+    if (yrCoreBal !== undefined && sharesBn > yrCoreBal) return 'Exceeds available yrCORE balance'
     if (activeLockCount !== undefined && Number(activeLockCount) >= 5) return 'Maximum 5 active locks reached'
     return null
   }
@@ -103,8 +106,8 @@ export default function Lock() {
       if (needsApprove) {
         setStep('approving')
         const hash = await writeContractAsync({
-          address: ADDRESSES.FundVaultV01, abi: FundVault_ABI, functionName: 'approve',
-          args: [ADDRESSES.LockRewardManagerV02, sharesBn],
+          address: ADDRESSES.YearRingCoreVaultV01, abi: FundVault_ABI, functionName: 'approve',
+          args: [ADDRESSES.LockPointsRebateManagerV02, sharesBn],
         })
         setTxHashApprove(hash)
         setStep('approve-wait')
@@ -113,7 +116,7 @@ export default function Lock() {
       }
       setStep('locking')
       const hash = await writeContractAsync({
-        address: ADDRESSES.LockRewardManagerV02, abi: LockRewardManager_ABI, functionName: 'lockWithReward',
+        address: ADDRESSES.LockPointsRebateManagerV02, abi: LockPointsRebateManager_ABI, functionName: 'lockWithPoints',
         args: [sharesBn, BigInt(tier.duration)],
       })
       setTxHashLock(hash)
@@ -127,11 +130,11 @@ export default function Lock() {
   }
 
   function btnLabel() {
-    if (step === 'approving' || step === 'approve-wait') return 'Approving fbUSDC…'
-    if (step === 'locking' || step === 'lock-wait') return 'Locking…'
+    if (step === 'approving' || step === 'approve-wait') return 'Approving yrCORE shares…'
+    if (step === 'locking' || step === 'lock-wait') return 'Locking + issuing Points…'
     if (step === 'done') return 'Locked ✓'
-    if (needsApprove) return 'Approve fbUSDC'
-    return 'Lock'
+    if (needsApprove) return 'Approve yrCORE shares'
+    return 'Lock + Earn Points'
   }
 
   const busy = step === 'approving' || step === 'approve-wait' || step === 'locking' || step === 'lock-wait'
@@ -144,8 +147,8 @@ export default function Lock() {
   return (
     <div className="page-content">
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>Lock fbUSDC</div>
-        <div className="note">Lock shares for a fixed duration to receive upfront RWT and fee discounts.</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--blue)' }}>Lock yrCORE shares</div>
+        <div className="note">Lock shares for a fixed duration to receive Points and become eligible for management fee rebates.</div>
       </div>
 
       <div className="card">
@@ -153,8 +156,8 @@ export default function Lock() {
 
         {/* Portfolio info */}
         <div className="info-row">
-          <span className="info-label">Available fbUSDC</span>
-          <span className="info-value">{fmtShares(fbBal)}</span>
+          <span className="info-label">Available yrCORE</span>
+          <span className="info-value">{fmtShares(yrCoreBal)}</span>
         </div>
         <div className="info-row">
           <span className="info-label">Active Locks</span>
@@ -180,7 +183,7 @@ export default function Lock() {
                 disabled={busy || done}
               >
                 <div style={{ fontWeight: 700 }}>{t.label}</div>
-                <div style={{ fontSize: 11, opacity: 0.7 }}>{t.days}d · {t.discountLabel} fee off</div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>{t.days}d · {t.discountLabel} fee rebate</div>
               </button>
             ))}
           </div>
@@ -188,7 +191,7 @@ export default function Lock() {
 
         {/* Shares input */}
         <div className="field">
-          <label>Shares to Lock (fbUSDC)</label>
+          <label>yrCORE shares to lock</label>
           <input
             type="number" min="0" step="0.000001"
             placeholder="0.000000"
@@ -217,12 +220,12 @@ export default function Lock() {
               <span>{(tier.multiplierBps / 100).toFixed(1)}×</span>
             </div>
             <div className="info-row" style={{ padding: '3px 0' }}>
-              <span className="info-label">Fee Discount</span>
+              <span className="info-label">Fee Rebate</span>
               <span style={{ color: 'var(--green)' }}>{tier.discountLabel}</span>
             </div>
             <div className="info-row" style={{ padding: '3px 0' }}>
-              <span className="info-label">Upfront RWT</span>
-              <span style={{ color: 'var(--blue)', fontWeight: 600 }}>{fmtRwt(previewRwt)}</span>
+              <span className="info-label">Upfront Points</span>
+              <span style={{ color: 'var(--blue)', fontWeight: 600 }}>{fmtPoints(previewPoints)}</span>
             </div>
             {usdcValue !== undefined && (
               <div className="info-row" style={{ padding: '3px 0' }}>
@@ -235,14 +238,16 @@ export default function Lock() {
               <span>{unlockDate}</span>
             </div>
             <div className="note" style={{ marginTop: 8, color: 'var(--yellow)' }}>
-              Warning: Early exit requires returning RWT. Locked shares cannot be redeemed until unlock.
+              Warning: Early exit may remove the Points associated with this lock before returning vault shares or assets. Locked shares cannot be redeemed until unlock.
             </div>
           </div>
         )}
 
         <div className="note" style={{ marginTop: 12 }}>
           This is a long-term commitment. Locked shares are not available for ordinary redemption during the lock period.
-          Early exit is possible but requires returning issued RWT.
+          Early exit is possible but requires returning all issued Points.
+          Rebate is a protocol benefit for eligible locked users. It is not guaranteed yield and may depend on protocol rules and available fee accrual.
+          Points are an internal closed beta accounting mechanism and are not a live tradable token.
         </div>
 
         <div className="btn-row">
@@ -260,8 +265,8 @@ export default function Lock() {
         </div>
 
         {errMsg && <div className="status err">{errMsg}</div>}
-        {txHashApprove && <TxResult hash={txHashApprove} label="Approve fbUSDC" />}
-        {txHashLock && done && <TxResult hash={txHashLock} label="Lock" />}
+        {txHashApprove && <TxResult hash={txHashApprove} label="Approve yrCORE shares" />}
+        {txHashLock && done && <TxResult hash={txHashLock} label="Lock + Issue Points" />}
       </div>
     </div>
   )

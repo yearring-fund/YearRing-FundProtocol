@@ -132,7 +132,7 @@ export default function BeneficiarySection() {
       <p className="note">
         Heartbeat records your last-active timestamp. Inactivity threshold: 365 days.<br />
         Execute Claim transfers <strong>locked positions only</strong>.
-        Free fbUSDC balance is <strong>not</strong> transferred.
+        Free yrCORE shares balance is <strong>not</strong> transferred.
         Fee rebate rights stay with the original lock owner.
       </p>
     </div>
