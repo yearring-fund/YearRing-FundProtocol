@@ -57,12 +57,10 @@ The following addresses were the V01/V02 Closed Beta deployment. They are **no l
 
 The V2.1 beta deployment is operated under controlled admin roles during the allowlisted testing phase. All admin, keeper, and emergency roles are held by a monitored operator address.
 
-- Emergency controls are limited to pause and Emergency Exit mode — cannot redirect or seize user funds
+- Emergency controls are limited to pause and Emergency Exit mode — they do not add a direct operator withdrawal path for user principal
 - Vault and strategy layers are separated with on-chain reserve enforcement (MIN 5% / TARGET 10% / MAX 15%)
 - Multisig and timelock governance are a planned hardening step and will be implemented before any allowlist expansion
 - External audit is pending before broader public expansion
-
-> **Note:** Timelock governance should only be described as active after the deployment record and on-chain role ownership confirm it. The V2.1 beta does not currently use a timelock contract.
 
 See [SECURITY.md](./SECURITY.md) for responsible disclosure and [docs/CURRENT_SECURITY_POSTURE.md](./docs/CURRENT_SECURITY_POSTURE.md) for full governance state.
 
