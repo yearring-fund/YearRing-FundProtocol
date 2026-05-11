@@ -12,7 +12,7 @@ import "./interfaces/ILockLedgerV02.sol";
 /// Inheritance rules (V2):
 ///   - Locked positions: transferred on-chain via LockLedger.transferLockOwnership().
 ///     Lock state (duration, unlockAt) is fully preserved.
-///   - Free fbUSDC assets: NOT transferred on-chain (off-chain coordination only).
+///   - Free yrCORE assets: NOT transferred on-chain (off-chain coordination only).
 ///   - Per-lock claim state: each lockId is independently claimable and re-tryable.
 ///     A failed or partial batch does not block future claims for other locks.
 ///
@@ -50,6 +50,7 @@ contract BeneficiaryModuleV02 is IBeneficiaryModuleV02, AccessControl {
     mapping(address => bool) private _adminMarked;
 
     /// @notice Per-lock claim state. true = this lockId has been inherited via executeClaim.
+    ///         executeClaim is re-callable; new locks created after a prior claim are still claimable.
     mapping(uint256 => bool) public inheritedClaimed;
 
     // -------------------------------------------------------------------------
@@ -108,25 +109,52 @@ contract BeneficiaryModuleV02 is IBeneficiaryModuleV02, AccessControl {
         external
         override
     {
+        if (lockIds.length == 0) revert EmptyLockIds();
         if (!isInactive(originalOwner)) revert UserNotInactive(originalOwner);
 
         address bene = beneficiaryOf(originalOwner);
         if (bene == originalOwner) revert NotBeneficiary(msg.sender, bene);
         if (msg.sender != bene)    revert NotBeneficiary(msg.sender, bene);
 
+        uint256 claimedCount;
+        uint256 skippedCount;
+
         for (uint256 i = 0; i < lockIds.length; i++) {
             uint256 lockId = lockIds[i];
 
-            if (inheritedClaimed[lockId]) revert LockAlreadyClaimed(lockId);
+            // Skip: already claimed via this module
+            if (inheritedClaimed[lockId]) {
+                emit BeneficiaryLockSkipped(originalOwner, bene, lockId, "ALREADY_CLAIMED");
+                skippedCount++;
+                continue;
+            }
 
             ILockLedgerV02.LockPosition memory pos = ledger.getLock(lockId);
-            // Lock must be active and currently owned by originalOwner
-            if (pos.owner != originalOwner || pos.unlocked) revert LockNotClaimable(lockId);
+
+            // Skip: lock is not owned by originalOwner
+            if (pos.owner != originalOwner) {
+                emit BeneficiaryLockSkipped(originalOwner, bene, lockId, "NOT_OWNED");
+                skippedCount++;
+                continue;
+            }
+
+            // Skip: lock already exited / unlocked
+            if (pos.unlocked) {
+                emit BeneficiaryLockSkipped(originalOwner, bene, lockId, "LOCK_UNLOCKED");
+                skippedCount++;
+                continue;
+            }
 
             inheritedClaimed[lockId] = true;
             ledger.transferLockOwnership(lockId, bene);
-            emit LockInherited(originalOwner, bene, lockId);
+            emit BeneficiaryLockClaimed(originalOwner, bene, lockId);
+            claimedCount++;
         }
+
+        // Revert if every lock in the batch was skipped — prevents silent no-ops
+        if (claimedCount == 0) revert NothingClaimed(originalOwner);
+
+        emit BeneficiaryClaimed(originalOwner, bene, claimedCount, skippedCount);
     }
 
     // -------------------------------------------------------------------------

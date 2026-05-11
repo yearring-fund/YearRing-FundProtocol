@@ -233,18 +233,22 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
 
         address oldOwner = pos.owner;
 
-        // Guard: ensure new owner has capacity for one more active lock
-        if (_activeLockCount[newOwner] >= MAX_ACTIVE_LOCKS_PER_USER)
-            revert TooManyActiveLocks(newOwner, MAX_ACTIVE_LOCKS_PER_USER);
-
+        // Inherited locks do NOT consume the new owner's active-lock creation slot.
+        // _activeLockCount[newOwner] is intentionally NOT incremented.
+        // _activeLockCount[oldOwner] is intentionally NOT decremented (no slot freed).
+        //
+        // The old owner's _userLockIds entry is left in place; view functions that
+        // report active state (userLockedSharesOf, lockedSharesOfAt) filter by
+        // pos.owner so transferred-out locks are excluded from the old owner.
+        //
+        // This design means:
+        //   - New owner can enumerate the inherited lock via _userLockIds[newOwner].
+        //   - Old owner's active-share views exclude the lock post-transfer.
+        //   - New owner's activeLockCount is unchanged — inherited locks are free slots.
+        //   - Third-party contracts that iterate raw userLockIds without pos.owner
+        //     filtering (e.g. legacy LockPointsV02) will see the lock under both
+        //     addresses; closed-beta PointsLedgerV01 is unaffected.
         pos.owner = newOwner;
-
-        // Sync counters
-        _activeLockCount[oldOwner]--;
-        _activeLockCount[newOwner]++;
-
-        // Sync index so all view/enumeration functions reflect current owner
-        _removeFromUserLockIds(oldOwner, lockId);
         _userLockIds[newOwner].push(lockId);
 
         emit LockOwnershipTransferred(lockId, oldOwner, newOwner, uint64(block.timestamp));
@@ -288,24 +292,29 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
     }
 
     /// @inheritdoc ILockLedgerV02
+    /// @dev Filters by pos.owner == owner to exclude locks that have been transferred out.
+    ///      An inherited lock (transferred in) appears in _userLockIds[owner] and is included
+    ///      only if pos.owner still matches (i.e. not subsequently re-transferred).
     function userLockedSharesOf(address owner) external view override returns (uint256 total) {
         uint256[] storage ids = _userLockIds[owner];
         for (uint256 i = 0; i < ids.length; i++) {
             LockPosition storage pos = _positions[ids[i]];
-            if (!pos.unlocked) total += pos.shares;
+            if (pos.owner == owner && !pos.unlocked) total += pos.shares;
         }
     }
 
     /// @inheritdoc ILockLedgerV02
-    /// @dev Historical accuracy caveat: after a transferLockOwnership(), the transferred lockId
-    ///      is removed from oldOwner's index and added to newOwner's index. Querying
-    ///      lockedSharesOfAt(oldOwner, t) for t < transfer time will NOT include that lock,
-    ///      even though oldOwner held it at time t. For precise historical reconstruction
-    ///      use LockOwnershipTransferred events (includes timestamp) off-chain.
+    /// @dev After transferLockOwnership(), the old owner's _userLockIds still contains the lockId
+    ///      but pos.owner has changed. This function filters by pos.owner == owner so that
+    ///      the transferred lock is excluded from the old owner at all time points.
+    ///      For a precise historical record of who owned what at a given moment, reconstruct
+    ///      from LockOwnershipTransferred events (each event carries a timestamp) off-chain.
     function lockedSharesOfAt(address owner, uint256 timestamp) external view override returns (uint256 total) {
         uint256[] storage ids = _userLockIds[owner];
         for (uint256 i = 0; i < ids.length; i++) {
             LockPosition storage pos = _positions[ids[i]];
+            // Exclude locks that are no longer owned by this address
+            if (pos.owner != owner) continue;
             // Position was active at `timestamp` if:
             //   - it was created at or before timestamp (lockedAt <= timestamp)
             //   - it had not yet ended: endedAt == 0 (still active now) OR endedAt > timestamp

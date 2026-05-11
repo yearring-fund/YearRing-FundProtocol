@@ -355,6 +355,127 @@ describe("LockLedgerV02", function () {
       await expect(ledger.connect(guardian).unpause()).to.be.reverted;
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // transferLockOwnership() — D1 redesign
+  // ---------------------------------------------------------------------------
+  describe("transferLockOwnership()", function () {
+    beforeEach(async function () {
+      // Grant OPERATOR_ROLE to admin so tests can call transferLockOwnership directly
+      const OPERATOR_ROLE = await ledger.OPERATOR_ROLE();
+      await ledger.connect(admin).grantRole(OPERATOR_ROLE, admin.address);
+    });
+
+    async function aliceLock(shares: bigint, duration: bigint): Promise<bigint> {
+      const tx = await ledger.connect(alice).lockFor(alice.address, shares, duration);
+      const receipt = await tx.wait();
+      const event = receipt!.logs
+        .map(l => { try { return ledger.interface.parseLog(l); } catch { return null; } })
+        .find(e => e?.name === "Locked");
+      return event!.args.lockId;
+    }
+
+    it("new owner can enumerate inherited lock via userLockIds", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D90);
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      const bobIds = await ledger.userLockIds(bob.address);
+      expect(bobIds.map(id => id.toString())).to.include(lockId.toString());
+    });
+
+    it("old owner no longer counted in userLockedSharesOf after transfer", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D90);
+      const aliceSharesBefore = await ledger.userLockedSharesOf(alice.address);
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      expect(await ledger.userLockedSharesOf(alice.address))
+        .to.equal(aliceSharesBefore - half);
+    });
+
+    it("new owner included in userLockedSharesOf after transfer", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D90);
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      expect(await ledger.userLockedSharesOf(bob.address)).to.equal(half);
+    });
+
+    it("inherited lock does NOT consume new owner's active-lock slot", async function () {
+      const fifth = aliceShares / 6n;
+      const lockId = await aliceLock(fifth, D90);
+      const bobActiveBefore = await ledger.activeLockCount(bob.address);
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      expect(await ledger.activeLockCount(bob.address)).to.equal(bobActiveBefore);
+    });
+
+    it("new owner can create MAX_ACTIVE_LOCKS_PER_USER locks after receiving inherited lock", async function () {
+      const tenth = aliceShares / 10n;
+      // Give bob some shares to lock
+      await usdc.mint(bob.address, D6(5_000));
+      await usdc.connect(bob).approve(await vault.getAddress(), ethers.MaxUint256);
+      await vault.connect(bob).deposit(D6(2_000), bob.address);
+      const bobShares = await vault.balanceOf(bob.address);
+      const slice = bobShares / 6n;
+
+      // Transfer one lock from alice to bob
+      await vault.connect(alice).approve(await ledger.getAddress(), ethers.MaxUint256);
+      const inheritedId = await aliceLock(tenth, D90);
+      await ledger.connect(admin).transferLockOwnership(inheritedId, bob.address);
+
+      // Bob should still be able to create 5 normal locks (inherited doesn't consume slot)
+      for (let i = 0; i < 5; i++) {
+        await expect(ledger.connect(bob).lockFor(bob.address, slice, D30)).to.not.be.reverted;
+      }
+    });
+
+    it("unlock on inherited lock does not underflow _activeLockCount", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D30);
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      await time.increase(Number(D30) + 1);
+      await expect(ledger.connect(bob).unlock(lockId)).to.not.be.reverted;
+    });
+
+    it("lockedSharesOfAt excludes transferred-out lock for old owner", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D90);
+      const ts = BigInt(await time.latest());
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      // After transfer, querying any timestamp for alice must exclude this lock
+      const aliceAtTs = await ledger.lockedSharesOfAt(alice.address, ts + 1000n);
+      expect(aliceAtTs).to.equal(0n);
+    });
+
+    it("pos.owner is updated to new owner after transfer", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D90);
+
+      await ledger.connect(admin).transferLockOwnership(lockId, bob.address);
+
+      const pos = await ledger.getLock(lockId);
+      expect(pos.owner).to.equal(bob.address);
+    });
+
+    it("emits LockOwnershipTransferred event", async function () {
+      const half = aliceShares / 2n;
+      const lockId = await aliceLock(half, D90);
+
+      await expect(ledger.connect(admin).transferLockOwnership(lockId, bob.address))
+        .to.emit(ledger, "LockOwnershipTransferred")
+        .withArgs(lockId, alice.address, bob.address, anyValue);
+    });
+  });
 });
 
 // helper — chai doesn't import anyValue automatically in all setups

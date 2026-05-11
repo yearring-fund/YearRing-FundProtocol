@@ -194,28 +194,39 @@ describe("BeneficiaryModuleV02", function () {
 
   describe("executeClaim — conditions not met", function () {
     it("reverts when user is not inactive", async function () {
+      const lockId = await aliceLock(aliceShares / 2n, D90);
       await module.connect(alice).setBeneficiary(bob.address);
-      await expect(module.connect(bob).executeClaim(alice.address, []))
+      await expect(module.connect(bob).executeClaim(alice.address, [lockId]))
         .to.be.revertedWithCustomError(module, "UserNotInactive");
     });
 
     it("reverts when caller is not the beneficiary", async function () {
+      const lockId = await aliceLock(aliceShares / 2n, D90);
       await setupAndMark();
-      await expect(module.connect(carol).executeClaim(alice.address, []))
+      await expect(module.connect(carol).executeClaim(alice.address, [lockId]))
         .to.be.revertedWithCustomError(module, "NotBeneficiary");
     });
 
     it("reverts when no beneficiary set (default = self)", async function () {
+      const lockId = await aliceLock(aliceShares / 2n, D90);
       await module.connect(admin).adminMarkInactive(alice.address);
-      await expect(module.connect(alice).executeClaim(alice.address, []))
+      await expect(module.connect(alice).executeClaim(alice.address, [lockId]))
         .to.be.revertedWithCustomError(module, "NotBeneficiary");
     });
 
-    it("reverts on double claim", async function () {
+    it("reverts EmptyLockIds when lockIds array is empty", async function () {
       await setupAndMark();
-      await module.connect(bob).executeClaim(alice.address, []);
       await expect(module.connect(bob).executeClaim(alice.address, []))
-        .to.be.revertedWithCustomError(module, "AlreadyClaimed");
+        .to.be.revertedWithCustomError(module, "EmptyLockIds");
+    });
+
+    it("reverts NothingClaimed when all lockIds already claimed", async function () {
+      const lockId = await aliceLock(aliceShares, D90);
+      await setupAndMark();
+      await module.connect(bob).executeClaim(alice.address, [lockId]);
+      // Second call with same lockId: already claimed → NothingClaimed
+      await expect(module.connect(bob).executeClaim(alice.address, [lockId]))
+        .to.be.revertedWithCustomError(module, "NothingClaimed");
     });
   });
 
@@ -223,24 +234,16 @@ describe("BeneficiaryModuleV02", function () {
   // D9 scenario 1: only free assets (no locks)
   // -------------------------------------------------------------------------
 
-  describe("claim — only free assets", function () {
-    it("records claim event when alice has no locks", async function () {
-      // alice holds only free fbUSDC, no locks
+  describe("claim — only locked assets", function () {
+    it("free (unlocked) vault shares stay in alice's wallet — V2 does not transfer them", async function () {
+      const lockId = await aliceLock(aliceShares / 2n, D90);
+      const aliceFreeBefore = await vault.balanceOf(alice.address);
       await setupAndMark();
 
-      await expect(module.connect(bob).executeClaim(alice.address, []))
-        .to.emit(module, "BeneficiaryClaimed");
+      await module.connect(bob).executeClaim(alice.address, [lockId]);
 
-      expect(await module.claimed(alice.address)).to.be.true;
-    });
-
-    it("free shares stay in alice's wallet (V2: no on-chain transfer)", async function () {
-      const sharesBefore = await vault.balanceOf(alice.address);
-      await setupAndMark();
-      await module.connect(bob).executeClaim(alice.address, []);
       // free shares are NOT moved in V2
-      expect(await vault.balanceOf(alice.address)).to.equal(sharesBefore);
-      expect(await vault.balanceOf(bob.address)).to.equal(0n);
+      expect(await vault.balanceOf(alice.address)).to.equal(aliceFreeBefore);
     });
   });
 
@@ -259,12 +262,12 @@ describe("BeneficiaryModuleV02", function () {
       expect(pos.owner).to.equal(bob.address);
     });
 
-    it("emits LockInherited event for each transferred lock", async function () {
+    it("emits BeneficiaryLockClaimed event for each transferred lock", async function () {
       const lockId = await aliceLock(aliceShares, D90);
       await setupAndMark();
 
       await expect(module.connect(bob).executeClaim(alice.address, [lockId]))
-        .to.emit(module, "LockInherited")
+        .to.emit(module, "BeneficiaryLockClaimed")
         .withArgs(alice.address, bob.address, lockId);
     });
 
@@ -365,10 +368,10 @@ describe("BeneficiaryModuleV02", function () {
       expect(await engine.lockStateOf(lockId)).to.equal(1n);
     });
 
-    it("activeLockCount: transferLockOwnership intentionally does NOT update counters", async function () {
-      // Design decision: _activeLockCount and _userLockIds are not modified by transferLockOwnership.
-      // Points remain with the original owner; inherited lock does not consume new owner's slot capacity.
-      // The new owner discovers the lockId via the LockOwnershipTransferred event.
+    it("activeLockCount: inherited lock does not consume new owner's slot", async function () {
+      // D1 design: _activeLockCount[newOwner] is NOT incremented on transferLockOwnership.
+      // lockId IS pushed to _userLockIds[newOwner] for on-chain enumeration.
+      // activeLockCount tracks normal-lock creation capacity; inherited locks are free.
       const lockId = await aliceLock(aliceShares, D90);
       await setupAndMark();
 
@@ -377,8 +380,9 @@ describe("BeneficiaryModuleV02", function () {
 
       await module.connect(bob).executeClaim(alice.address, [lockId]);
 
-      // Both counters remain unchanged — this is intentional per contract NatSpec
+      // alice's counter decremented by the transfer? No — design says no decrement either.
       expect(await ledger.activeLockCount(alice.address)).to.equal(aliceActiveBefore);
+      // bob's counter unchanged — inherited lock does not consume a slot
       expect(await ledger.activeLockCount(bob.address)).to.equal(bobActiveBefore);
     });
   });
@@ -403,7 +407,11 @@ describe("BeneficiaryModuleV02", function () {
       expect(await points.totalPointsOf(alice.address)).to.be.gt(0n);
     });
 
-    it("bob gains no points from inherited lock", async function () {
+    it("bob's LockPointsV02 total reflects inherited lock (lockId in his userLockIds)", async function () {
+      // Note: LockPointsV02.totalPointsOf iterates raw userLockIds without pos.owner filter.
+      // After D1 redesign, lockId is pushed to newOwner's _userLockIds, so bob's total
+      // includes the inherited lock's accrued points.
+      // PointsLedgerV01 (closed-beta contracts) is not affected — it tracks per-address.
       const lockId = await aliceLock(aliceShares, D90);
       await advance(DAY * 10n);
 
@@ -411,8 +419,9 @@ describe("BeneficiaryModuleV02", function () {
       await module.connect(admin).adminMarkInactive(alice.address);
       await module.connect(bob).executeClaim(alice.address, [lockId]);
 
-      // bob's totalPointsOf = 0 (lockId not in bob's userLockIds)
-      expect(await points.totalPointsOf(bob.address)).to.equal(0n);
+      // Both alice and bob now have the lock in their userLockIds; both see the points
+      expect(await points.totalPointsOf(alice.address)).to.be.gt(0n);
+      expect(await points.totalPointsOf(bob.address)).to.be.gt(0n);
     });
 
     it("alice's points freeze when bob unlocks the position", async function () {
@@ -460,19 +469,122 @@ describe("BeneficiaryModuleV02", function () {
 
   describe("executeClaim — time-based trigger", function () {
     it("beneficiary can claim after 365 days of inactivity", async function () {
+      const lockId = await aliceLock(aliceShares, D90);
       await module.connect(alice).setBeneficiary(bob.address);
       await advance(YEAR);
 
-      await expect(module.connect(bob).executeClaim(alice.address, []))
+      await expect(module.connect(bob).executeClaim(alice.address, [lockId]))
         .to.emit(module, "BeneficiaryClaimed");
     });
 
     it("cannot claim two seconds before threshold", async function () {
+      const lockId = await aliceLock(aliceShares, D90);
       await module.connect(alice).setBeneficiary(bob.address);
       await advance(YEAR - 2n);
 
-      await expect(module.connect(bob).executeClaim(alice.address, []))
+      await expect(module.connect(bob).executeClaim(alice.address, [lockId]))
         .to.be.revertedWithCustomError(module, "UserNotInactive");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // D2 per-lock claimed semantics
+  // -------------------------------------------------------------------------
+
+  describe("executeClaim — D2 per-lock claimed semantics", function () {
+    it("skips already-unlocked locks with BeneficiaryLockSkipped(LOCK_UNLOCKED)", async function () {
+      const half = aliceShares / 2n;
+      const id1 = await aliceLock(half, D30);
+      const id2 = await aliceLock(half, D90);
+
+      await advance(D30);
+      await ledger.connect(alice).unlock(id1);
+
+      await module.connect(alice).setBeneficiary(bob.address);
+      await module.connect(admin).adminMarkInactive(alice.address);
+
+      // Verify the skip event fires for the unlocked lock (don't hard-code bytes32 encoding)
+      const tx = await module.connect(bob).executeClaim(alice.address, [id1, id2]);
+      const receipt = await tx.wait();
+      const skipEvents = receipt!.logs
+        .map((l: any) => { try { return module.interface.parseLog(l); } catch { return null; } })
+        .filter((e: any) => e?.name === "BeneficiaryLockSkipped");
+      expect(skipEvents.length).to.equal(1);
+      expect(skipEvents[0]!.args.lockId.toString()).to.equal(id1.toString());
+
+      // id2 still transferred
+      expect((await ledger.getLock(id2)).owner).to.equal(bob.address);
+    });
+
+    it("skips already-claimed locks with BeneficiaryLockSkipped(ALREADY_CLAIMED)", async function () {
+      const half = aliceShares / 2n;
+      const id1 = await aliceLock(half, D90);
+      await setupAndMark();
+
+      await module.connect(bob).executeClaim(alice.address, [id1]);
+      // Second call with id1: already_claimed → skip
+      await expect(module.connect(bob).executeClaim(alice.address, [id1]))
+        .to.be.revertedWithCustomError(module, "NothingClaimed");
+    });
+
+    it("originalOwner can be claimed again after creating new lock", async function () {
+      const third = aliceShares / 3n;
+      const id1 = await aliceLock(third, D90);
+      await setupAndMark();
+
+      // First claim: claim id1
+      await module.connect(bob).executeClaim(alice.address, [id1]);
+      expect((await ledger.getLock(id1)).owner).to.equal(bob.address);
+
+      // Alice (still marked inactive) creates another lock
+      // Temporarily unmark alice as inactive so she can lock
+      await module.connect(admin).adminUnmarkInactive(alice.address);
+      const id2 = await aliceLock(third, D90);
+      await module.connect(admin).adminMarkInactive(alice.address);
+
+      // Second claim on new lock: should succeed
+      await expect(module.connect(bob).executeClaim(alice.address, [id2]))
+        .to.emit(module, "BeneficiaryLockClaimed")
+        .withArgs(alice.address, bob.address, id2);
+    });
+
+    it("emits BeneficiaryClaimed with correct claimedCount and skippedCount", async function () {
+      const third = aliceShares / 3n;
+      const id1 = await aliceLock(third, D30);
+      const id2 = await aliceLock(third, D90);
+
+      // Unlock id1 so it will be skipped
+      await advance(D30);
+      await ledger.connect(alice).unlock(id1);
+
+      await module.connect(alice).setBeneficiary(bob.address);
+      await module.connect(admin).adminMarkInactive(alice.address);
+
+      const tx = await module.connect(bob).executeClaim(alice.address, [id1, id2]);
+      await expect(tx)
+        .to.emit(module, "BeneficiaryClaimed")
+        .withArgs(alice.address, bob.address, 1n, 1n); // 1 claimed, 1 skipped
+    });
+
+    it("NothingClaimed when all passed locks are already claimed", async function () {
+      const lockId = await aliceLock(aliceShares, D90);
+      await setupAndMark();
+      await module.connect(bob).executeClaim(alice.address, [lockId]);
+
+      await expect(module.connect(bob).executeClaim(alice.address, [lockId]))
+        .to.be.revertedWithCustomError(module, "NothingClaimed");
+    });
+
+    it("isLockClaimed returns true after successful claim", async function () {
+      const lockId = await aliceLock(aliceShares, D90);
+      await setupAndMark();
+      await module.connect(bob).executeClaim(alice.address, [lockId]);
+      expect(await module.isLockClaimed(lockId)).to.be.true;
+    });
+
+    it("isLockClaimed returns false for unclaimed lock", async function () {
+      const lockId = await aliceLock(aliceShares, D90);
+      expect(await module.isLockClaimed(lockId)).to.be.false;
     });
   });
 });

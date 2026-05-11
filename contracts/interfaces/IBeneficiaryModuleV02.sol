@@ -19,11 +19,29 @@ interface IBeneficiaryModuleV02 {
     /// @notice Emitted when a user calls heartbeat(), proving they are active.
     event HeartbeatRecorded(address indexed owner, uint64 timestamp);
 
-    /// @notice Emitted for each lock position successfully transferred to the beneficiary.
-    event LockInherited(address indexed originalOwner, address indexed beneficiary, uint256 indexed lockId);
+    /// @notice Emitted for each lock successfully transferred to the beneficiary.
+    event BeneficiaryLockClaimed(
+        address indexed originalOwner,
+        address indexed beneficiary,
+        uint256 indexed lockId
+    );
 
-    /// @notice Emitted once per executeClaim call after all eligible locks are processed.
-    event BeneficiaryClaimed(address indexed originalOwner, address indexed beneficiary);
+    /// @notice Emitted for each lock that was skipped (already claimed, already unlocked,
+    ///         or not owned by originalOwner).
+    event BeneficiaryLockSkipped(
+        address indexed originalOwner,
+        address indexed beneficiary,
+        uint256 indexed lockId,
+        bytes32 reason
+    );
+
+    /// @notice Emitted once per executeClaim call summarising the outcome.
+    event BeneficiaryClaimed(
+        address indexed originalOwner,
+        address indexed beneficiary,
+        uint256 claimedCount,
+        uint256 skippedCount
+    );
 
     // -------------------------------------------------------------------------
     // Errors
@@ -33,9 +51,8 @@ interface IBeneficiaryModuleV02 {
     error SelfBeneficiary();
     error UserNotInactive(address owner);
     error NotBeneficiary(address caller, address expectedBeneficiary);
-    error AlreadyClaimed(address originalOwner);
-    error LockAlreadyClaimed(uint256 lockId);
-    error LockNotClaimable(uint256 lockId);
+    error NothingClaimed(address originalOwner);
+    error EmptyLockIds();
 
     // -------------------------------------------------------------------------
     // User actions
