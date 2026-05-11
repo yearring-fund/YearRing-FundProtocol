@@ -2,20 +2,22 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../interfaces/IGovernanceSignalV02.sol";
 
-/// @dev Minimal interface for ERC20Snapshot methods used by governance
-interface ISnapshotToken is IERC20 {
+/// @dev Minimal interface for PointsLedgerV01 methods used by governance.
+///      Does NOT extend IERC20 — PointsLedgerV01 is not a transferable token.
+interface ISnapshotToken {
     function snapshot() external returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
     function balanceOfAt(address account, uint256 snapshotId) external view returns (uint256);
 }
 
 /// @title GovernanceSignalV02
-/// @notice Signal-only governance module. RWT snapshot balance = voting power.
-/// @dev    TOKEN REQUIREMENT: this contract depends on a snapshot-capable RWT implementation.
-///         RewardToken must extend ERC20Snapshot (OZ v4) and expose snapshot() + balanceOfAt().
-///         A plain ERC20 RewardToken will compile but castVote will always read balance 0.
+/// @notice Signal-only governance module. Points (YRPTS) snapshot balance = voting power.
+///         Non-binding during closed beta — results are recorded on-chain for transparency only.
+/// @dev    TOKEN REQUIREMENT: this contract depends on a snapshot-capable PointsToken implementation.
+///         PointsToken must extend ERC20Snapshot (OZ v4) and expose snapshot() + balanceOfAt().
+///         A plain ERC20 token will compile but castVote will always read balance 0.
 ///
 /// Design constraints:
 ///   - Proposals are created by admin only; users vote.
@@ -25,9 +27,9 @@ interface ISnapshotToken is IERC20 {
 ///   - Vault / Ledger / RewardManager accounting is completely unaffected.
 ///
 /// Voting rules:
-///   - Voter must hold >= votingThreshold RWT at proposal-creation snapshot.
+///   - Voter must hold >= votingThreshold Points (YRPTS) at proposal-creation snapshot.
 ///   - Weight = rewardToken.balanceOfAt(voter, snapshotId) — frozen at proposal creation,
-///     preventing the same tokens from voting twice across different addresses.
+///     preventing the same Points from voting twice across different addresses.
 ///   - Each address may cast exactly one vote per proposal.
 ///   - Passed = forVotes > againstVotes. No quorum required (low-friction signaling only).
 ///   - abstainVotes are recorded for transparency but do not affect the passed flag.
@@ -53,10 +55,10 @@ contract GovernanceSignalV02 is IGovernanceSignalV02, AccessControl {
     // Immutables
     // -------------------------------------------------------------------------
 
-    /// @notice RWT token — snapshot-capable; voting power frozen at proposal creation
+    /// @notice Points token (YRPTS) — snapshot-capable; voting power frozen at proposal creation
     ISnapshotToken public immutable rewardToken;
 
-    /// @notice Minimum RWT balance required to cast a vote
+    /// @notice Minimum Points (YRPTS) balance required to cast a vote
     uint256 public immutable votingThreshold;
 
     /// @notice Duration of each proposal's voting window (seconds)
@@ -79,8 +81,8 @@ contract GovernanceSignalV02 is IGovernanceSignalV02, AccessControl {
     // Constructor
     // -------------------------------------------------------------------------
 
-    /// @param rewardToken_     RWT token address
-    /// @param votingThreshold_ Minimum RWT to cast a vote (e.g. 10e18 for 10 RWT)
+    /// @param rewardToken_     PointsToken (YRPTS) address — must extend ERC20Snapshot
+    /// @param votingThreshold_ Minimum Points (YRPTS) to cast a vote (e.g. 100e18 for 100 Points)
     /// @param votingPeriod_    Voting window duration in seconds (e.g. 7 days)
     /// @param admin_           Address granted DEFAULT_ADMIN_ROLE (proposal creation)
     constructor(

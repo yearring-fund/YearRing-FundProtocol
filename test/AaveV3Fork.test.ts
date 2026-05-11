@@ -143,17 +143,22 @@ describe("AaveV3Fork — real Aave V3 on Base mainnet fork", function () {
     }
   });
 
-  // Activate fork once before all tests
+  // Activate fork once before all tests; skip suite if fork activation fails
   before(async function () {
     this.timeout(120_000);
     const params: Record<string, unknown> = { jsonRpcUrl: BASE_RPC };
     if (FORK_BLOCK) params.blockNumber = FORK_BLOCK;
 
-    await network.provider.request({
-      method: "hardhat_reset",
-      params: [{ forking: params }],
-    });
-    console.log(`  Fork active — block ${FORK_BLOCK ?? "latest"}`);
+    try {
+      await network.provider.request({
+        method: "hardhat_reset",
+        params: [{ forking: params }],
+      });
+      console.log(`  Fork active — block ${FORK_BLOCK ?? "latest"}`);
+    } catch (e: any) {
+      console.log(`  ⚠  Fork activation failed (${String(e.message).slice(0, 100)}) — skipping fork tests`);
+      this.skip();
+    }
   });
 
   // Reset to clean hardhat state after all fork tests

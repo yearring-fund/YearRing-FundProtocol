@@ -10,7 +10,7 @@ import "./interfaces/IStrategyManagerV01.sol";
 import "./interfaces/IStrategyV01.sol";
 
 /// @title StrategyManagerV01
-/// @notice Middle layer between FundVaultV01 and a single Strategy contract.
+/// @notice Middle layer between YearRingCoreVaultV01 and a single Strategy contract.
 ///         Handles capital routing, accounting closure, and risk controls.
 /// @dev V01: single strategy only. Multi-strategy support deferred to V2.
 contract StrategyManagerV01 is IStrategyManagerV01, AccessControl, Pausable, ReentrancyGuard {
@@ -52,10 +52,10 @@ contract StrategyManagerV01 is IStrategyManagerV01, AccessControl, Pausable, Ree
     // State
     // -------------------------------------------------------------------------
 
-    /// @notice Underlying asset (same as FundVaultV01.asset())
+    /// @notice Underlying asset (same as YearRingCoreVaultV01.asset())
     IERC20 public immutable underlying;
 
-    /// @notice FundVaultV01 address — destination for returnToVault()
+    /// @notice YearRingCoreVaultV01 address — destination for returnToVault()
     address public vault;
 
     /// @notice Active strategy (V01: single strategy)
@@ -72,7 +72,7 @@ contract StrategyManagerV01 is IStrategyManagerV01, AccessControl, Pausable, Ree
     // -------------------------------------------------------------------------
 
     /// @param underlying_ Underlying ERC20 asset address
-    /// @param vault_ FundVaultV01 address
+    /// @param vault_ YearRingCoreVaultV01 address
     /// @param admin_ DEFAULT_ADMIN_ROLE holder (timelock / multisig)
     constructor(
         address underlying_,
@@ -214,9 +214,9 @@ contract StrategyManagerV01 is IStrategyManagerV01, AccessControl, Pausable, Ree
         emit PartialEmergencyExitTriggered(amount);
     }
 
-    /// @notice Pull `amount` from strategy and forward to vault; called by vault rebalance() only.
+    /// @notice Pull `amount` from strategy and forward to vault; called by vault _autoRebalance() only.
     /// @dev Bypasses role check — gated by vault address comparison instead.
-    ///      Divest failure is not re-thrown; vault rebalance() catches via try/catch.
+    ///      Divest failure is not re-thrown; vault catches via try/catch.
     function returnForRebalance(uint256 amount) external override nonReentrant {
         if (msg.sender != vault) revert NotVault();
         if (amount == 0) revert ZeroAmount();
@@ -232,6 +232,26 @@ contract StrategyManagerV01 is IStrategyManagerV01, AccessControl, Pausable, Ree
             emit ReturnedToVault(toReturn);
         }
         emit Divested(amount, withdrawn);
+    }
+
+    /// @notice Invest `amount` of idle underlying (already transferred by vault) into the active strategy.
+    ///         Called by vault _autoRebalance() only when reserve ratio exceeds MAX_RESERVE_BPS (15%).
+    /// @dev Push model: vault transfers USDC here first, then calls this function.
+    ///      Blocked when paused or no strategy configured — vault wraps in try/catch.
+    ///      If this reverts, USDC remains idle in this contract; totalManagedAssets() still accounts for it.
+    function deployForRebalance(uint256 amount) external override nonReentrant whenNotPaused {
+        if (msg.sender != vault) revert NotVault();
+        if (amount == 0) revert ZeroAmount();
+        if (strategy == address(0)) revert NoStrategy();
+
+        uint256 idle = underlying.balanceOf(address(this));
+        if (idle < amount) revert NotEnoughIdle(idle, amount);
+
+        // Push model: transfer to strategy, then notify
+        underlying.safeTransfer(strategy, amount);
+        IStrategyV01(strategy).invest(amount);
+
+        emit Invested(amount);
     }
 
     // -------------------------------------------------------------------------

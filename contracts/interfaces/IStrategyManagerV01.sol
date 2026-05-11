@@ -9,9 +9,16 @@ interface IStrategyManagerV01 {
     /// @return Total managed assets denominated in the vault's underlying asset
     function totalManagedAssets() external view returns (uint256);
 
-    /// @notice Called exclusively by the vault's permissionless rebalance() to pull funds
-    ///         back when reserve ratio falls below the floor.
+    /// @notice Called exclusively by the vault's _autoRebalance() to pull funds back when
+    ///         reserve ratio falls below MIN_RESERVE_BPS (5%).
     /// @dev Only callable by vault address. Divests `amount` from strategy, then
-    ///      transfers idle to vault. A failure here causes rebalance() to emit RebalanceDivestFailed.
+    ///      transfers idle to vault. A failure here causes vault to emit RebalanceDivestFailed.
     function returnForRebalance(uint256 amount) external;
+
+    /// @notice Called exclusively by the vault's _autoRebalance() to invest funds that were
+    ///         just transferred by the vault when reserve ratio exceeds MAX_RESERVE_BPS (15%).
+    /// @dev Only callable by vault address. Vault transfers `amount` to this contract first,
+    ///      then calls this. Blocked when paused or no strategy set.
+    ///      A failure here leaves USDC idle in this contract (still tracked by totalManagedAssets).
+    function deployForRebalance(uint256 amount) external;
 }

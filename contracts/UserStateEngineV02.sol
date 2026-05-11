@@ -10,10 +10,10 @@ import "./interfaces/ILockLedgerV02.sol";
 ///
 /// State derivation rules (per lock position):
 ///   owner == address(0)              → Normal   (position not created)
-///   unlocked == true                 → Normal   (position already withdrawn)
+///   unlocked == true, earlyExited == false → Normal   (position already withdrawn at maturity)
+///   unlocked == true, earlyExited == true  → EarlyExit (exited before maturity via earlyExit)
 ///   unlocked == false, now < unlockAt → LockedAccumulating
 ///   unlocked == false, now >= unlockAt → Matured
-///   EarlyExit                        → V3+ reserved, unreachable in V2
 ///
 /// User aggregate state priority: EarlyExit > LockedAccumulating > Matured > Normal
 contract UserStateEngineV02 is IUserStateEngineV02 {

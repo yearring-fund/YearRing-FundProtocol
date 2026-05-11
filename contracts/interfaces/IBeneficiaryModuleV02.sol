@@ -22,6 +22,9 @@ interface IBeneficiaryModuleV02 {
     /// @notice Emitted for each lock position successfully transferred to the beneficiary.
     event LockInherited(address indexed originalOwner, address indexed beneficiary, uint256 indexed lockId);
 
+    /// @notice Emitted once per executeClaim call after all eligible locks are processed.
+    event BeneficiaryClaimed(address indexed originalOwner, address indexed beneficiary);
+
     // -------------------------------------------------------------------------
     // Errors
     // -------------------------------------------------------------------------
@@ -30,6 +33,7 @@ interface IBeneficiaryModuleV02 {
     error SelfBeneficiary();
     error UserNotInactive(address owner);
     error NotBeneficiary(address caller, address expectedBeneficiary);
+    error AlreadyClaimed(address originalOwner);
     error LockAlreadyClaimed(uint256 lockId);
     error LockNotClaimable(uint256 lockId);
 

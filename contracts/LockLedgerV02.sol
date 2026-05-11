@@ -9,11 +9,12 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/ILockLedgerV02.sol";
 
 /// @title LockLedgerV02
-/// @notice Users lock FundVaultV01 shares (fbUSDC) for a fixed duration to earn benefits.
+/// @notice Users lock YearRing vault shares (ERC4626) for a fixed duration to earn benefits.
 ///         Normal unlock requires maturity. earlyExit() allows exit before maturity:
-///         principal is returned in full; points entitlement is forfeited.
-/// @dev V02 thin-layer module — does NOT modify FundVaultV01 accounting in any way.
+///         principal is returned in full; Points entitlement for that lock is deducted.
+/// @dev Thin-layer module — does NOT modify vault accounting in any way.
 ///      Interacts with vault shares purely via standard ERC20 transferFrom / transfer.
+///      Closed beta: deployed as a new instance bound to the vault share token address.
 contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -62,7 +63,7 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
     // State
     // -------------------------------------------------------------------------
 
-    /// @notice FundVaultV01 share token (fbUSDC)
+    /// @notice YearRing vault share token (ERC4626 shares)
     IERC20 public immutable vaultShares;
 
     /// @notice Auto-incrementing lock ID counter
@@ -84,7 +85,7 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
     // Constructor
     // -------------------------------------------------------------------------
 
-    /// @param vaultShares_ FundVaultV01 address (its ERC20 shares token)
+    /// @param vaultShares_ Vault share token address (ERC4626 shares)
     /// @param admin_       DEFAULT_ADMIN_ROLE holder
     /// @param emergency_   EMERGENCY_ROLE holder (pause only)
     constructor(address vaultShares_, address admin_, address emergency_) {
@@ -165,7 +166,9 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
 
         pos.unlocked = true;
         pos.endedAt  = uint64(block.timestamp);
-        _activeLockCount[msg.sender]--;
+        // Guard: inherited locks (via transferLockOwnership) do not increment the new owner's
+        // counter, so we skip the decrement to avoid underflow.
+        if (_activeLockCount[msg.sender] > 0) _activeLockCount[msg.sender]--;
         totalLockedShares -= pos.shares;
 
         vaultShares.safeTransfer(msg.sender, pos.shares);
@@ -201,7 +204,8 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
         pos.unlocked    = true;
         pos.earlyExited = true;
         pos.endedAt     = uint64(block.timestamp);
-        _activeLockCount[owner]--;
+        // Guard: inherited locks do not increment new owner's counter (see transferLockOwnership).
+        if (_activeLockCount[owner] > 0) _activeLockCount[owner]--;
         totalLockedShares -= pos.shares;
 
         vaultShares.safeTransfer(owner, pos.shares);
@@ -229,7 +233,7 @@ contract LockLedgerV02 is ILockLedgerV02, AccessControl, Pausable, ReentrancyGua
 
         address oldOwner = pos.owner;
 
-        // Bug fix: count active locks by current owner
+        // Guard: ensure new owner has capacity for one more active lock
         if (_activeLockCount[newOwner] >= MAX_ACTIVE_LOCKS_PER_USER)
             revert TooManyActiveLocks(newOwner, MAX_ACTIVE_LOCKS_PER_USER);
 

@@ -7,10 +7,10 @@ interface IMetricsLayerV02 {
 
     /// @notice Immutable protocol snapshot — all fields computed in a single call
     struct ProtocolSnapshot {
-        /// @notice FundVaultV01.totalAssets() — USDC (6-decimal)
+        /// @notice vault.totalAssets() — USDC (6-decimal)
         uint256 totalTVL;
 
-        /// @notice LockLedgerV02.totalLockedShares() — fbUSDC (18-decimal)
+        /// @notice LockLedgerV02.totalLockedShares() — vault shares (18-decimal)
         uint256 totalLockedShares;
 
         /// @notice totalLockedShares × 10000 / vault.totalSupply() (bps)
