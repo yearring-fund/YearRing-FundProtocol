@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "timestamp": "2026-04-06T13:37:48.398Z",
+    "network": "base",
+    "blockNumber": 44346660,
+    "contracts": {
+      "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "FundVaultV01": "0x8acaec738F9559F8b025c4372d827D3CD3928322",
+      "StrategyManagerV01": "0xa44d3b9b0ECD6fFa4bD646957468c0B5Bfa64A54",
+      "AaveV3StrategyV01": "0x621CC4189946128eF2d584F69bb994C84FcA612D"
+    }
+  },
+  "roles": {
+    "admin": "0x087ea7F67d9282f0bdC43627b855F79789C6824C",
+    "guardian": "0xC8052cF447d429f63E890385a6924464B85c5834",
+    "vault_admin_ok": true,
+    "vault_guardian_ok": true,
+    "mgr_admin_ok": true,
+    "mgr_guardian_ok": true
+  },
+  "systemStatus": {
+    "systemMode": 0,
+    "depositsPaused": false,
+    "redeemsPaused": false,
+    "managerPaused": false,
+    "depositsEffectivelyBlocked": false
+  },
+  "vault": {
+    "totalAssets_usdc": 0.001394,
+    "totalSupply_fbusdc": 0.001713476917904309,
+    "pricePerShare_usdc": 0.813659,
+    "availableToInvest": 0.000976
+  },
+  "manager": {
+    "totalManagedAssets": 0,
+    "idleUnderlying": 0,
+    "investCap": 20000,
+    "minIdle": 0
+  },
+  "strategy": {
+    "totalUnderlying": 0
+  },
+  "limits": {
+    "tvl_cap": 20000,
+    "tvl_used": 0.001394,
+    "tvl_pct": 0.000006970000000000001,
+    "invest_cap": 20000,
+    "invest_used": 0,
+    "invest_pct": 0,
+    "daily_cap": 5000,
+    "daily_used": 0,
+    "daily_pct": 0,
+    "daily_date": "2026-04-06",
+    "per_user_cap": 2000
+  },
+  "users": [
+    {
+      "label": "User-A",
+      "address": "0xa7C381eA23E12B83500A5D3eEE850068740B0339",
+      "allowed": true,
+      "shares_raw": "23115308236760",
+      "shares_fmt": 0.00002311530823676,
+      "value_usdc": 0.000018,
+      "headroom_usdc": 1999.999982,
+      "pct_of_cap": 9e-7
+    },
+    {
+      "label": "User-B",
+      "address": "0x9d84145F057C2fd532250891E9b02BDe0C92CcB4",
+      "allowed": true,
+      "shares_raw": "529592303414",
+      "shares_fmt": 5.29592303414e-7,
+      "value_usdc": 0,
+      "headroom_usdc": 2000,
+      "pct_of_cap": 0
+    },
+    {
+      "label": "User-C",
+      "address": "0x2dfF07C3Bb71CB6c6EB366b4b2f30CEb48771d4B",
+      "allowed": true,
+      "shares_raw": "516336668331",
+      "shares_fmt": 5.16336668331e-7,
+      "value_usdc": 0,
+      "headroom_usdc": 2000,
+      "pct_of_cap": 0
+    },
+    {
+      "label": "User-D",
+      "address": "0x747062942aC7e66BD162FAE8F05c7d2a8C9e8DFe",
+      "allowed": true,
+      "shares_raw": "95609059888",
+      "shares_fmt": 9.5609059888e-8,
+      "value_usdc": 0,
+      "headroom_usdc": 2000,
+      "pct_of_cap": 0
+    },
+    {
+      "label": "User-E",
+      "address": "0x6248C59f517e096258C611578a19F80e594E379B",
+      "allowed": true,
+      "shares_raw": "0",
+      "shares_fmt": 0,
+      "value_usdc": 0,
+      "headroom_usdc": 2000,
+      "pct_of_cap": 0
+    }
+  ]
+}

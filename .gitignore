@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Hardhat / TypeChain outputs
+artifacts/
+cache/
+typechain-types/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Frontend / build outputs
+dist/
+build/
+coverage/
+
+# Local/system files
+.DS_Store
+
+# Local deployment records that may include operational addresses
+deployments/
+
+# Internal development docs
+fd/
+
+# Private outreach, investor communications, and external contact drafts
+outreach/
+
+# Application materials (binary / confidential)
+application/*.pptx
+application/*.pdf
+application/*.key
+application/*.pages
+
+# Org setup / GitHub org configuration (managed separately)
+org-setup/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+scripts/drill_*.ts

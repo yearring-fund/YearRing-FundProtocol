@@ -1,0 +1,467 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #30363d;
+  --text:    #e6edf3;
+  --muted:   #8b949e;
+  --blue:    #58a6ff;
+  --green:   #3fb950;
+  --yellow:  #d29922;
+  --red:     #f85149;
+  --r:       8px;
+  --font:    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+a { color: var(--blue); text-decoration: none; }
+code { font-family: monospace; font-size: 12px; }
+
+/* ── Layout ─────────────────────────────────────────────── */
+.page { max-width: 1400px; margin: 0 auto; }
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.logo { font-size: 16px; font-weight: 600; color: var(--blue); }
+.logo .tag {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 11px;
+  margin-left: 8px;
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 12px;
+}
+
+/* ── Network alert ───────────────────────────────────────── */
+.net-alert {
+  background: #2d1f00;
+  border: 1px solid var(--yellow);
+  color: var(--yellow);
+  text-align: center;
+  padding: 12px;
+  font-size: 13px;
+}
+.net-alert button { margin-left: 12px; }
+
+/* ── Addresses not configured ───────────────────────────── */
+.addr-warn {
+  background: #1a1010;
+  border: 1px solid var(--red);
+  color: var(--red);
+  text-align: center;
+  padding: 10px;
+  font-size: 12px;
+}
+
+/* ── Stats bar ───────────────────────────────────────────── */
+.stats-bar {
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.stat {
+  flex: 1;
+  min-width: 130px;
+  padding: 10px 20px;
+  border-right: 1px solid var(--border);
+}
+.stat:last-child { border-right: none; }
+.stat-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.stat-value { font-size: 16px; font-weight: 600; margin-top: 2px; }
+
+/* ── Section grid ────────────────────────────────────────── */
+.sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  padding: 16px 24px;
+}
+.full-width {
+  padding: 0 24px 16px;
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 16px;
+}
+.card-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+/* ── Info rows ───────────────────────────────────────────── */
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.info-label { color: var(--muted); font-size: 12px; }
+.info-value { font-weight: 500; }
+
+/* ── Divider ─────────────────────────────────────────────── */
+.divider { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+/* ── Field ───────────────────────────────────────────────── */
+.field { margin-top: 10px; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.field input,
+.field select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font);
+}
+.field input:focus,
+.field select:focus { outline: none; border-color: var(--blue); }
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+button {
+  padding: 7px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: opacity 0.1s;
+  white-space: nowrap;
+}
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:not(:disabled):hover { opacity: 0.85; }
+
+.btn-primary   { background: var(--blue); color: #000; }
+.btn-secondary { background: #21262d; color: var(--text); border: 1px solid var(--border); }
+.btn-danger    { background: #3d1212; color: var(--red);   border: 1px solid #5c1010; }
+.btn-green     { background: #0d2310; color: var(--green); border: 1px solid #1a4a20; }
+.btn-sm        { padding: 4px 10px; font-size: 12px; }
+
+/* ── Status ──────────────────────────────────────────────── */
+.status {
+  margin-top: 8px;
+  font-size: 12px;
+  min-height: 18px;
+  word-break: break-word;
+}
+.status.ok   { color: var(--green); }
+.status.err  { color: var(--red); }
+.status.info { color: var(--blue); }
+
+/* ── Badges ──────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.badge-blue   { background: #0d2641; color: var(--blue);   border: 1px solid #1c4070; }
+.badge-green  { background: #0d2310; color: var(--green);  border: 1px solid #1a4a20; }
+.badge-yellow { background: #2d1f00; color: var(--yellow); border: 1px solid #4a3000; }
+.badge-red    { background: #2d0b0b; color: var(--red);    border: 1px solid #5c1010; }
+.badge-gray   { background: #1c2026; color: var(--muted);  border: 1px solid var(--border); }
+
+/* ── Note text ───────────────────────────────────────────── */
+.note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* ── Mono ────────────────────────────────────────────────── */
+.mono { font-family: monospace; font-size: 12px; word-break: break-all; }
+
+/* ── Lock rows ───────────────────────────────────────────── */
+.lock-row {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+.lock-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.lock-id { font-size: 11px; color: var(--muted); }
+
+/* ── Demo state ──────────────────────────────────────────── */
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* ── Demo tag ────────────────────────────────────────────── */
+.demo-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #2d1f00;
+  color: var(--yellow);
+  border: 1px solid #4a3000;
+  white-space: nowrap;
+}
+
+/* ── Sparkline ───────────────────────────────────────────── */
+.sparkline-wrap {
+  margin-top: 4px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* ── Yield table ─────────────────────────────────────────── */
+.yield-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.yield-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.yield-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.yield-table tr:last-child td { border-bottom: none; }
+
+/* ── Rules block ─────────────────────────────────────────── */
+.rules-block { margin-bottom: 4px; }
+.rules-block-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* ── DAO Bridge ──────────────────────────────────────────── */
+.dao-bridge {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.dao-bridge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.dao-bridge-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--blue);
+}
+.dao-bridge-power {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.dao-bridge-placeholder {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+.dao-bridge-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.tab, .tab-active {
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-family: var(--font);
+}
+.tab-active {
+  background: #0d2641;
+  color: var(--blue);
+  border-color: #1c4070;
+}
+.proposal-list { display: flex; flex-direction: column; gap: 12px; }
+.proposal-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 14px;
+}
+.proposal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.vote-bar-wrap { margin: 10px 0 4px; }
+.vote-bar {
+  height: 6px;
+  background: #2d0b0b;
+  border-radius: 3px;
+  display: flex;
+  overflow: hidden;
+}
+.vote-bar-for     { background: var(--green); transition: width 0.3s; }
+.vote-bar-against { background: var(--red);   transition: width 0.3s; }
+.dao-bridge-v3-note {
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+  line-height: 1.6;
+}
+
+/* ── Admin Console ───────────────────────────────────────── */
+.admin-console {
+  background: #0d1117;
+  border: 1px solid #4a3000;
+  border-radius: var(--r);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.admin-console-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--yellow);
+  border-bottom: 1px solid #4a3000;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* ── Limitations ─────────────────────────────────────────── */
+.limitations-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+.limitations-list li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.limitations-list li:last-child { border-bottom: none; }
+.limitations-list li::before { content: "⚠ "; color: var(--yellow); }
+
+/* ── Step 4 nav tabs ──────────────────────────────────────── */
+.nav-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.nav-tab { padding: 5px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; border: 1px solid var(--border); background: var(--bg); color: var(--muted); text-decoration: none; display: inline-block; }
+.nav-tab.active { background: #0d2641; color: var(--blue); border-color: #1c4070; }
+.nav-tab:hover:not(.active) { color: var(--text); }
+
+/* ── Page content ─────────────────────────────────────────── */
+.page-content { max-width: 860px; margin: 0 auto; padding: 24px; }
+
+/* ── Step 4 banner ────────────────────────────────────────── */
+.step4-banner { background: #1a1400; border-bottom: 1px solid #4a3000; padding: 6px 24px; font-size: 11px; color: var(--yellow); display: flex; gap: 16px; align-items: center; }
+
+/* ── Confirm overlay / modal ──────────────────────────────── */
+.confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.confirm-modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 24px; max-width: 480px; width: 100%; }
+
+/* ── Tier buttons ─────────────────────────────────────────── */
+.tier-btn { padding: 10px 20px; border-radius: 8px; border: 2px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-size: 13px; font-family: var(--font); }
+.tier-btn.selected { border-color: var(--blue); background: #0d2641; color: var(--blue); }
+.tier-btns { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+/* ── Pct buttons ──────────────────────────────────────────── */
+.pct-btns { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ── Result card ──────────────────────────────────────────── */
+.result-card { background: #0d200d; border: 1px solid #1a4a20; border-radius: 6px; padding: 12px; margin-top: 10px; }
+.result-card a { color: var(--green); font-size: 11px; }
+
+/* ── Proposal card (page) ─────────────────────────────────── */
+/* Note: .proposal-card already defined above for DAO bridge, extend here */
+.vote-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn-for { background: #0d2310; color: var(--green); border: 1px solid #1a4a20; }
+.btn-against { background: #2d0b0b; color: var(--red); border: 1px solid #5c1010; }
+.btn-abstain { background: #21262d; color: var(--muted); border: 1px solid var(--border); }
+
+/* ── Signal banner ────────────────────────────────────────── */
+.signal-banner { background: #1a1400; border: 1px solid #4a3000; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--yellow); }
+
+/* ── Claim card ───────────────────────────────────────────── */
+.claim-card { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-bottom: 10px; }

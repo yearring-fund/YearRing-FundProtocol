@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YearRing-FundProtocol — Base Mainnet</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.1/ethers.umd.min.js"></script>
+  <script src="./mainnet-config.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0d1117; color: #e6edf3;
+      min-height: 100vh;
+    }
+    h1 { margin: 0 0 4px; font-size: 1.4rem; font-weight: 600; }
+    .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 24px; }
+
+    /* Allowlist banner */
+    .allowlist-banner {
+      background: #161b22;
+      border: 1px solid #f0883e;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .allowlist-banner .icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 1px; }
+    .allowlist-banner .title { font-weight: 600; color: #f0883e; margin-bottom: 4px; }
+    .allowlist-banner .desc { color: #8b949e; font-size: 0.85rem; line-height: 1.5; }
+
+    /* Cards */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; padding: 16px 20px;
+    }
+    .card .label { color: #8b949e; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .card .value { font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .card .sub { color: #8b949e; font-size: 0.8rem; margin-top: 4px; }
+
+    /* Status pills */
+    .pill {
+      display: inline-block; padding: 2px 10px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .pill.ok     { background: #1a4731; color: #3fb950; }
+    .pill.warn   { background: #3d2c00; color: #e3b341; }
+    .pill.paused { background: #4a1f1f; color: #f85149; }
+
+    /* Wallet section */
+    .section {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; padding: 20px; margin-bottom: 16px;
+    }
+    .section h2 { margin: 0 0 16px; font-size: 1rem; font-weight: 600; }
+
+    button {
+      background: #238636; color: #fff; border: none;
+      padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #21262d; color: #8b949e; cursor: default; }
+
+    .addr { font-family: monospace; font-size: 0.8rem; color: #8b949e; word-break: break-all; }
+    .user-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    .user-stat { }
+    .user-stat .label { color: #8b949e; font-size: 0.78rem; text-transform: uppercase; }
+    .user-stat .value { font-size: 1.1rem; font-weight: 600; }
+
+    .refreshed { color: #8b949e; font-size: 0.78rem; margin-top: 12px; }
+
+    /* Contract addresses table */
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th { text-align: left; color: #8b949e; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #21262d; }
+    td { padding: 6px 8px; border-bottom: 1px solid #21262d; font-family: monospace; color: #c9d1d9; }
+    td:first-child { font-family: inherit; color: #8b949e; white-space: nowrap; }
+
+    .error-msg { color: #f85149; font-size: 0.85rem; margin-top: 8px; }
+    .loading { color: #8b949e; font-size: 0.85rem; }
+
+    /* Step3 phase badge */
+    .phase-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 20px; padding: 5px 14px;
+      font-size: 0.78rem; font-weight: 600;
+      color: #8b949e; margin-bottom: 20px;
+    }
+    .phase-badge .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #e3b341; flex-shrink: 0;
+    }
+    .phase-badge .phase-text { color: #e6edf3; }
+
+    /* Risk disclaimer */
+    .risk-disclaimer {
+      background: #161b22; border: 1px solid #30363d;
+      border-left: 3px solid #f0883e;
+      border-radius: 8px; padding: 16px 20px;
+      margin-top: 8px;
+    }
+    .risk-disclaimer h3 {
+      margin: 0 0 10px; font-size: 0.85rem; font-weight: 600;
+      color: #f0883e; text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .risk-disclaimer ul {
+      margin: 0; padding-left: 18px;
+      color: #8b949e; font-size: 0.82rem; line-height: 1.7;
+    }
+    .risk-disclaimer ul li { margin-bottom: 2px; }
+
+    /* Limits section */
+    .limit-row { margin-bottom: 14px; }
+    .limit-label { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px; }
+    .limit-label .lname { color: #8b949e; }
+    .limit-label .lval  { color: #e6edf3; font-variant-numeric: tabular-nums; }
+    .progress-track {
+      height: 8px; background: #21262d; border-radius: 4px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 4px;
+      background: #238636; transition: width 0.3s;
+    }
+    .progress-fill.warn   { background: #e3b341; }
+    .progress-fill.danger { background: #f85149; }
+
+    /* Allowlist eligibility */
+    .eligibility { margin-top: 12px; font-size: 0.85rem; }
+    .elig-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+    .elig-row .pill { font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+
+<h1>YearRing-FundProtocol</h1>
+<div class="subtitle">FinancialBase Protocol · Base Mainnet · Read-only dashboard</div>
+
+<!-- Step3 Phase Badge -->
+<div>
+  <span class="phase-badge">
+    <span class="dot"></span>
+    <span class="phase-text">STEP 3 · WHITELIST RUN PERIOD</span>
+    <span>— Controlled invite-only operation. Not a public product.</span>
+  </span>
+</div>
+
+<!-- Allowlist Banner -->
+<div class="allowlist-banner">
+  <div class="icon">🔒</div>
+  <div>
+    <div class="title">Allowlist / Invitation Mode</div>
+    <div class="desc">
+      This protocol is currently operating in <strong>invite-only mode</strong>.
+      <strong>Deposits</strong> require an approved address (allowlist).
+      <strong>Redemptions are always available</strong> to existing shareholders regardless of allowlist status.<br>
+      This page provides read-only access to on-chain state.
+      No transactions are initiated from this dashboard.
+    </div>
+  </div>
+</div>
+
+<!-- Protocol Stats -->
+<div class="cards" id="stats-cards">
+  <div class="card">
+    <div class="label">Vault Total Assets</div>
+    <div class="value" id="stat-total-assets"><span class="loading">—</span></div>
+    <div class="sub">USDC managed by vault</div>
+  </div>
+  <div class="card">
+    <div class="label">Price per Share</div>
+    <div class="value" id="stat-pps"><span class="loading">—</span></div>
+    <div class="sub">USDC per fbUSDC</div>
+  </div>
+  <div class="card">
+    <div class="label">Total Shares</div>
+    <div class="value" id="stat-total-supply"><span class="loading">—</span></div>
+    <div class="sub">fbUSDC outstanding</div>
+  </div>
+  <div class="card">
+    <div class="label">Strategy Deployed</div>
+    <div class="value" id="stat-strategy"><span class="loading">—</span></div>
+    <div class="sub">Aave V3 USDC</div>
+  </div>
+</div>
+
+<!-- System Status -->
+<div class="section">
+  <h2>System Status</h2>
+  <span id="stat-mode" class="loading" style="font-size:0.9rem">—</span>
+  &nbsp;&nbsp;
+  <span id="stat-deposits" class="loading" style="font-size:0.9rem">—</span>
+  &nbsp;&nbsp;
+  <span id="stat-redeems" class="loading" style="font-size:0.9rem">—</span>
+  <div class="refreshed" id="refreshed-at">Not loaded yet</div>
+</div>
+
+<!-- Limits & Capacity -->
+<div class="section">
+  <h2>Step3 Limits &amp; Capacity</h2>
+
+  <!-- TVL cap -->
+  <div class="limit-row">
+    <div class="limit-label">
+      <span class="lname">TVL (totalAssets) vs cap <span style="color:#8b949e;font-size:0.75rem">20,000 USDC</span></span>
+      <span class="lval" id="lim-tvl-text">—</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="lim-tvl-bar" style="width:0%"></div></div>
+  </div>
+
+  <!-- investCap -->
+  <div class="limit-row">
+    <div class="limit-label">
+      <span class="lname">Strategy deployed vs investCap <span style="color:#8b949e;font-size:0.75rem">on-chain</span></span>
+      <span class="lval" id="lim-invest-text">—</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="lim-invest-bar" style="width:0%"></div></div>
+  </div>
+
+  <div style="color:#8b949e;font-size:0.78rem;margin-top:8px">
+    Per-user cap: <strong style="color:#e6edf3">2,000 USDC</strong> &nbsp;|&nbsp;
+    Daily deposit cap: <strong style="color:#e6edf3">5,000 USDC</strong> (script-layer, local tracking) &nbsp;|&nbsp;
+    Allowlist: <strong style="color:#e6edf3">invite-only</strong>
+  </div>
+</div>
+
+<!-- Wallet / User Position -->
+<div class="section">
+  <h2>Your Position</h2>
+  <button id="connect-btn" onclick="connectWallet()">Connect Wallet</button>
+  <div id="wallet-info" style="display:none">
+    <div class="addr" id="wallet-addr"></div>
+    <div class="user-row">
+      <div class="user-stat">
+        <div class="label">fbUSDC Shares</div>
+        <div class="value" id="user-shares">—</div>
+      </div>
+      <div class="user-stat">
+        <div class="label">Estimated Value</div>
+        <div class="value" id="user-value">—</div>
+      </div>
+      <div class="user-stat">
+        <div class="label">Wallet USDC</div>
+        <div class="value" id="user-usdc">—</div>
+      </div>
+    </div>
+    <!-- Allowlist eligibility & headroom -->
+    <div class="eligibility" id="user-eligibility" style="display:none">
+      <div class="elig-row">
+        <span id="user-allowlist-pill">—</span>
+        <span id="user-headroom" style="color:#8b949e"></span>
+      </div>
+    </div>
+    <div style="color:#8b949e;font-size:0.78rem;margin-top:14px;border-top:1px solid #21262d;padding-top:10px">
+      To deposit or redeem, contact the admin. All transactions are executed off-dashboard via admin-coordinated scripts.
+    </div>
+  </div>
+  <div class="error-msg" id="wallet-error"></div>
+</div>
+
+<!-- Contract Addresses -->
+<div class="section">
+  <h2>Contract Addresses <span style="color:#8b949e;font-weight:400;font-size:0.8rem">(Base Mainnet · Chain ID 8453)</span></h2>
+  <table>
+    <thead><tr><th>Contract</th><th>Address</th></tr></thead>
+    <tbody id="addr-table"></tbody>
+  </table>
+</div>
+
+<script>
+"use strict";
+
+const CFG = window.MAINNET_CONFIG;
+let staticProvider = null;
+let userProvider = null;
+let userAddr = null;
+
+const fmt6  = (n) => parseFloat(ethers.formatUnits(n, 6)).toFixed(6);
+const fmt18 = (n) => parseFloat(ethers.formatUnits(n, 18)).toFixed(4);
+const fmtShort = (n, dec) => {
+  const v = parseFloat(ethers.formatUnits(n, dec));
+  return v < 0.000001 ? v.toExponential(4) : v.toFixed(6);
+};
+
+// ── Build contract address table ──────────────────────────────────────────
+
+(function buildAddrTable() {
+  const tbody = document.getElementById("addr-table");
+  const rows = [
+    ["FundVaultV01",       CFG.ADDRESSES.FundVaultV01],
+    ["StrategyManagerV01", CFG.ADDRESSES.StrategyManagerV01],
+    ["AaveV3StrategyV01",  CFG.ADDRESSES.AaveV3StrategyV01],
+    ["USDC",               CFG.ADDRESSES.USDC],
+  ];
+  for (const [name, addr] of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${name}</td><td>${addr}</td>`;
+    tbody.appendChild(tr);
+  }
+})();
+
+// ── Read-only protocol stats ───────────────────────────────────────────────
+
+async function loadStats() {
+  try {
+    staticProvider = new ethers.JsonRpcProvider(CFG.RPC_URL);
+    const vault    = new ethers.Contract(CFG.ADDRESSES.FundVaultV01,       CFG.ABI.FundVaultV01,       staticProvider);
+    const manager  = new ethers.Contract(CFG.ADDRESSES.StrategyManagerV01, CFG.ABI.StrategyManagerV01, staticProvider);
+    const strategy = new ethers.Contract(CFG.ADDRESSES.AaveV3StrategyV01,  CFG.ABI.AaveV3StrategyV01,  staticProvider);
+
+    const [totalAssets, totalSupply, ppsRaw, stratUnderlying, systemMode, depPaused, redPaused, investCapRaw] =
+      await Promise.all([
+        vault.totalAssets(),
+        vault.totalSupply(),
+        vault.pricePerShare(),
+        strategy.totalUnderlying(),
+        vault.systemMode(),
+        vault.depositsPaused(),
+        vault.redeemsPaused(),
+        manager.investCap(),
+      ]);
+
+    document.getElementById("stat-total-assets").textContent = fmt6(totalAssets) + " USDC";
+    document.getElementById("stat-pps").textContent          = fmt6(ppsRaw) + " USDC";
+    document.getElementById("stat-total-supply").textContent = fmt18(totalSupply) + " fbUSDC";
+    document.getElementById("stat-strategy").textContent     = fmt6(stratUnderlying) + " USDC";
+
+    // System mode
+    const modeLabels = ["Normal", "Paused", "EmergencyExit"];
+    const modeClass  = systemMode === 0n ? "ok" : "paused";
+    document.getElementById("stat-mode").innerHTML =
+      `<span class="pill ${modeClass}">Mode: ${modeLabels[Number(systemMode)] || "Unknown"}</span>`;
+
+    // Deposits are blocked when depositsPaused=true OR systemMode != Normal(0)
+    const depositsEffectivelyBlocked = depPaused || systemMode !== 0n;
+    document.getElementById("stat-deposits").innerHTML = depositsEffectivelyBlocked
+      ? `<span class="pill paused">Deposits Paused</span>`
+      : `<span class="pill ok">Deposits Open</span>`;
+
+    // In EmergencyExit mode: redeem() reverts with UseClaimExitAssets(); must use claimExitAssets() instead
+    const redeemLabel = redPaused
+      ? `<span class="pill paused">Redeems Paused</span>`
+      : systemMode === 2n
+        ? `<span class="pill warn">Redeems: Use claimExitAssets</span>`
+        : `<span class="pill ok">Redeems Open</span>`;
+    document.getElementById("stat-redeems").innerHTML = redeemLabel;
+
+    document.getElementById("refreshed-at").textContent =
+      "Last updated: " + new Date().toLocaleTimeString();
+
+    // ── Limits bars ─────────────────────────────────────────────────────────
+    const TVL_CAP    = 20_000.0;
+    const tvlUsdc    = parseFloat(ethers.formatUnits(totalAssets, 6));
+    const investCap  = parseFloat(ethers.formatUnits(investCapRaw, 6));
+    const stratUsdc  = parseFloat(ethers.formatUnits(stratUnderlying, 6));
+
+    function setBar(textId, barId, used, cap) {
+      const pct = cap > 0 ? Math.min(used / cap * 100, 100) : 0;
+      document.getElementById(textId).textContent =
+        used.toFixed(2) + " / " + cap.toFixed(0) + " USDC (" + pct.toFixed(1) + "%)";
+      const bar = document.getElementById(barId);
+      bar.style.width = pct.toFixed(1) + "%";
+      bar.className = "progress-fill" + (pct >= 100 ? " danger" : pct >= 80 ? " warn" : "");
+    }
+
+    setBar("lim-tvl-text",    "lim-tvl-bar",    tvlUsdc,   TVL_CAP);
+    setBar("lim-invest-text", "lim-invest-bar",  stratUsdc, investCap > 0 ? investCap : TVL_CAP);
+
+    // If wallet already connected, refresh user data too
+    if (userAddr) await loadUserPosition(vault);
+
+  } catch (err) {
+    document.getElementById("refreshed-at").textContent = "Load failed: " + err.message;
+    console.error(err);
+  }
+}
+
+// ── Wallet connect + user position ────────────────────────────────────────
+
+async function connectWallet() {
+  const errEl = document.getElementById("wallet-error");
+  errEl.textContent = "";
+  if (!window.ethereum) {
+    errEl.textContent = "MetaMask not detected. Install it to view your position.";
+    return;
+  }
+  try {
+    userProvider = new ethers.BrowserProvider(window.ethereum);
+    await userProvider.send("eth_requestAccounts", []);
+    const signer = await userProvider.getSigner();
+    userAddr = await signer.getAddress();
+
+    const network = await userProvider.getNetwork();
+    if (Number(network.chainId) !== CFG.CHAIN_ID) {
+      errEl.textContent = `Wrong network (chainId ${network.chainId}). Please switch to Base Mainnet (8453).`;
+      return;
+    }
+
+    document.getElementById("connect-btn").disabled = true;
+    document.getElementById("connect-btn").textContent = "Connected";
+    document.getElementById("wallet-addr").textContent = userAddr;
+    document.getElementById("wallet-info").style.display = "block";
+
+    const vault = new ethers.Contract(CFG.ADDRESSES.FundVaultV01, CFG.ABI.FundVaultV01, userProvider);
+    await loadUserPosition(vault);
+
+  } catch (err) {
+    errEl.textContent = "Connection failed: " + err.message;
+  }
+}
+
+async function loadUserPosition(vault) {
+  try {
+    const usdc = new ethers.Contract(CFG.ADDRESSES.USDC, CFG.ABI.USDC, staticProvider || userProvider);
+    const [shares, usdcBal, allowed] = await Promise.all([
+      vault.balanceOf(userAddr),
+      usdc.balanceOf(userAddr),
+      vault.isAllowed(userAddr),
+    ]);
+    const estimated = shares > 0n ? await vault.convertToAssets(shares) : 0n;
+
+    document.getElementById("user-shares").textContent = fmt18(shares) + " fbUSDC";
+    document.getElementById("user-value").textContent  = fmt6(estimated) + " USDC";
+    document.getElementById("user-usdc").textContent   = fmt6(usdcBal) + " USDC";
+
+    // Allowlist eligibility & headroom
+    const PER_USER_CAP = 2_000.0;
+    const valueUsdc    = parseFloat(ethers.formatUnits(estimated, 6));
+    const headroom     = Math.max(0, PER_USER_CAP - valueUsdc);
+    const pillHtml     = allowed
+      ? `<span class="pill ok">Allowlisted ✓</span>`
+      : `<span class="pill paused">Not on allowlist</span>`;
+    const headroomTxt  = allowed
+      ? `Deposit headroom: ${headroom.toFixed(2)} USDC (per-user cap ${PER_USER_CAP} USDC)`
+      : "Contact admin to request access.";
+
+    document.getElementById("user-allowlist-pill").innerHTML = pillHtml;
+    document.getElementById("user-headroom").textContent     = headroomTxt;
+    document.getElementById("user-eligibility").style.display = "block";
+
+  } catch (err) {
+    document.getElementById("wallet-error").textContent = "Failed to load position: " + err.message;
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+
+loadStats();
+// Auto-refresh every 60 seconds
+setInterval(loadStats, 60000);
+</script>
+
+<!-- Risk Disclaimer -->
+<div class="risk-disclaimer">
+  <h3>Risk Notice — Whitelist Run Period</h3>
+  <ul>
+    <li>This protocol is in an <strong style="color:#e6edf3">early-stage, invite-only whitelist run</strong>. It is not open to the public.</li>
+    <li>Participation requires prior approval. Deposits are restricted to allowlisted addresses only.</li>
+    <li>Yield is generated via Aave V3 on Base. <strong style="color:#e6edf3">Returns are not guaranteed</strong> and depend on market conditions.</li>
+    <li>Smart contracts have been tested but are not formally audited. Use only funds you can afford to lose at this stage.</li>
+    <li>This dashboard is read-only. No transactions are initiated from this page.</li>
+    <li>The protocol may be paused or adjusted at any time during this test period. Redemptions remain available to existing shareholders even when deposits are paused.</li>
+  </ul>
+</div>
+
+</body>
+</html>
